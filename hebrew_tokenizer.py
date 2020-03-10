@@ -3,11 +3,11 @@ from unidecode import unidecode
 
 
 class HebTokenizer:
-
     # Correct usage of final letters (ךםןףץ) is enforced. Final פ is allowed.
     # Same letter repitition (שולטתתתת), which is a common form of slang writing, is limited to a maximum of max_letter_repetition (default=3).
     # Acronyms (צה"ל) and abbrevations ('וכו) are excluded.
     # MWE refers to multi-word expression *candidates*, which are tokenized based on hyphen/makaf or surrounding punctuation.
+    # hyphen-based MWE's are discarded if the contain more than max_mwe_hyphens (default=1)
 
     hebrew_diacritics = '\u0591-\u05bd\u05bf-\u05c2\u05c4\u05c5\u05c7' # all nikud and teamim except makaf, sof-pasuk, nun-hafukha
     hebrew_letters = 'א-ת'
@@ -18,11 +18,15 @@ class HebTokenizer:
     nonfinal_letter_geresh_pattern = '(?:[' + nonfinal_letters_allowing_geresh + ']\'|[' + nonfinal_letters + '])'
     final_letter_geresh_pattern = '(?:[' + final_letters_allowing_geresh + ']\'|[' + final_letters + '])'
 
-    def __init__(self, max_letter_repetition=3):
+    def __init__(self, max_letter_repetition=3, max_mwe_hyphens=1):
         self.max_letter_repetition = max_letter_repetition
         self.word_pattern = '(?<![' + self.hebrew_letters + '][^\s-])\\b(?:(' + self.nonfinal_letter_geresh_pattern + ')(?!\\1{' + str(
-            self.max_letter_repetition) + '}))+' + self.final_letter_geresh_pattern + '(?!\w)(?![^\s-][' + self.hebrew_letters + '])'
-        self.mwe_pattern = '(?<!-)' + self.word_pattern + '(?:-' + self.word_pattern.replace('\\1','\\2') + '|' + '(?: ' + self.word_pattern.replace('\\1','\\3') + ')+)(?!-)'
+            self.max_letter_repetition) + '}))+' + self.final_letter_geresh_pattern + '(?!\w)(?![^\s-][' + self.hebrew_letters + '])(?!-(?:$|[^' + self.hebrew_letters + ']))'
+        self.mwe_pattern = '(?<!-)' + self.word_pattern + '(?:(?: ' + self.word_pattern.replace('\\1','\\2') + ')+'
+        if max_mwe_hyphens != 0:
+            self.mwe_pattern += '|(?:-' + self.word_pattern.replace('\\1','\\3') + '){1,'+('' if max_mwe_hyphens is None else str(max_mwe_hyphens))+'}'
+        self.mwe_pattern += ')(?!-)'
+
         self.word_regex = re.compile(self.word_pattern)
         self.mwe_regex = re.compile(self.mwe_pattern)
 
@@ -56,7 +60,6 @@ class HebTokenizer:
 
 if __name__ == '__main__':
     text = 'א בְּרֵאשִׁ֖ית בָּרָ֣א אֱלֹהִ֑ים אֵ֥ת הַשָּׁמַ֖יִם וְאֵ֥ת הָאָֽרֶץ. ב וְהָאָ֗רֶץ הָיְתָ֥ה תֹ֙הוּ֙ וָבֹ֔הוּ וְחֹ֖שֶׁךְ עַל־פְּנֵ֣י תְה֑וֹם, וְר֣וּחַ אֱלֹהִ֔ים מְרַחֶ֖פֶת עַל־פְּנֵ֥י הַמָּֽיִם. ג וַיֹּ֥אמֶר אֱלֹהִ֖ים: "יְהִ֣י א֑וֹר", וַֽיְהִי־אֽוֹר. ד וַיַּ֧רְא אֱלֹהִ֛ים אֶת־הָא֖וֹר כִּי־ט֑וֹב, וַיַּבְדֵּ֣ל אֱלֹהִ֔ים בֵּ֥ין הָא֖וֹר וּבֵ֥ין הַחֹֽשֶׁךְ. ה וַיִּקְרָ֨א אֱלֹהִ֤ים לָאוֹר֙ "י֔וֹם" וְלַחֹ֖שֶׁךְ קָ֣רָא "לָ֑יְלָה", וַֽיְהִי־עֶ֥רֶב וַֽיְהִי־בֹ֖קֶר י֥וֹם אֶחָֽד.'
-
 
     def print_with_len(lst):
         print(lst, len(lst))
