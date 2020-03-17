@@ -7,7 +7,8 @@ class HebTokenizer:
     # Same letter repitition (שולטתתתת), which is a common form of slang writing, is limited to a maximum of max_letter_repetition (default=3).
     # Acronyms (צה"ל) and abbrevations ('וכו) are excluded.
     # MWE refers to multi-word expression *candidates*, which are tokenized based on hyphen/makaf or surrounding punctuation.
-    # hyphen-based MWE's are discarded if the contain more than max_mwe_hyphens (default=1)
+    # Hyphen-based MWE's are discarded if the contain more than max_mwe_hyphens (default=1).
+    # Strict mode enforces the absence of extraneous hebrew letters on the same line of the MWE.
 
     hebrew_diacritics = '\u0591-\u05bd\u05bf-\u05c2\u05c4\u05c5\u05c7' # all nikud and teamim except makaf, sof-pasuk, nun-hafukha
     hebrew_letters = 'א-ת'
@@ -26,9 +27,11 @@ class HebTokenizer:
         if max_mwe_hyphens != 0:
             self.mwe_pattern += '|(?:-' + self.word_pattern.replace('\\1','\\3') + '){1,'+('' if max_mwe_hyphens is None else str(max_mwe_hyphens))+'}'
         self.mwe_pattern += ')(?!-)'
+        self.line_with_strict_mwe_pattern = '^[^' + self.hebrew_letters + ']*' + self.mwe_pattern + '[^' + self.hebrew_letters + ']*$'
 
         self.word_regex = re.compile(self.word_pattern)
         self.mwe_regex = re.compile(self.mwe_pattern)
+        self.line_with_strict_mwe_regex = re.compile(self.line_with_strict_mwe_pattern, flags=re.MULTILINE)
 
     def sanitize(self, text):
         text = re.sub('[' + self.hebrew_diacritics + ']', '', text)
@@ -41,7 +44,7 @@ class HebTokenizer:
 
     def get_words(self, text):
         text = self.sanitize(text)
-        return [match.group(0) for match in self.word_regex.finditer(text)]
+        return [match.group() for match in self.word_regex.finditer(text)]
 
     def is_mwe(self, text):
         text = self.sanitize(text)
@@ -50,12 +53,14 @@ class HebTokenizer:
     def is_word_or_mwe(self, text):
         return self.is_word(text) or self.is_mwe(text)
 
-    def get_mwe(self, text):
+    def get_mwe(self, text, strict=False):
         text = self.sanitize(text)
-        return [match.group(0) for match in self.mwe_regex.finditer(text)]
+        if strict:
+            return [self.mwe_regex.search(match.group()).group() for match in self.line_with_strict_mwe_regex.finditer(text)]
+        return [match.group() for match in self.mwe_regex.finditer(text)]
 
-    def get_mwe_words(self, text):
-        return [re.split('[ -]', mwe) for mwe in self.get_mwe(text)]
+    def get_mwe_words(self, text, strict=False):
+        return [re.split('[ -]', mwe) for mwe in self.get_mwe(text, strict=strict)]
 
 
 if __name__ == '__main__':
@@ -63,7 +68,6 @@ if __name__ == '__main__':
 
     def print_with_len(lst):
         print(lst, len(lst))
-
 
     heb_tokenizer = HebTokenizer()
     print_with_len(text)
