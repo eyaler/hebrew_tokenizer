@@ -4,7 +4,7 @@ from unidecode import unidecode
 
 class HebTokenizer:
     # Correct usage of final letters (ךםןףץ) is enforced. Final פ is allowed.
-    # Same letter repitition (שולטתתתת), which is a common form of slang writing, is limited to a maximum of max_letter_repetition (default=3),
+    # Same letter repetition (שולטתתתת), which is a common form of slang writing, is limited to a maximum of max_letter_repetition (default=3),
     #   and at the end of words a maximum max_end_of_word_letter_repetition (default=2).
     # Acronyms (צה"ל) and abbrevations ('וכו) are excluded.
     # MWE refers to multi-word expression *candidates*, which are tokenized based on hyphen/makaf or surrounding punctuation.
