@@ -4,7 +4,8 @@ from unidecode import unidecode
 
 class HebTokenizer:
     # Correct usage of final letters (ךםןףץ) is enforced. Final פ is allowed.
-    # Same letter repitition (שולטתתתת), which is a common form of slang writing, is limited to a maximum of max_letter_repetition (default=3).
+    # Same letter repitition (שולטתתתת), which is a common form of slang writing, is limited to a maximum of max_letter_repetition (default=3),
+    #   and at the end of words a maximum max_end_of_word_letter_repetition (default=2).
     # Acronyms (צה"ל) and abbrevations ('וכו) are excluded.
     # MWE refers to multi-word expression *candidates*, which are tokenized based on hyphen/makaf or surrounding punctuation.
     # Hyphen-based MWE's are discarded if the contain more than max_mwe_hyphens (default=1).
@@ -19,10 +20,12 @@ class HebTokenizer:
     nonfinal_letter_geresh_pattern = '(?:[' + nonfinal_letters_allowing_geresh + ']\'|[' + nonfinal_letters + '])'
     final_letter_geresh_pattern = '(?:[' + final_letters_allowing_geresh + ']\'|[' + final_letters + '])'
 
-    def __init__(self, max_letter_repetition=3, max_mwe_hyphens=1):
+    def __init__(self, max_letter_repetition=3, max_end_of_word_letter_repetition=2, max_mwe_hyphens=1):
         self.max_letter_repetition = max_letter_repetition
-        self.word_pattern = '(?<![' + self.hebrew_letters + '][^\s-])\\b(?:(' + self.nonfinal_letter_geresh_pattern + ')(?!\\1{' + str(
-            self.max_letter_repetition) + '}))+' + self.final_letter_geresh_pattern + '(?!\w)(?![^\s-][' + self.hebrew_letters + '])(?!-(?:$|[^' + self.hebrew_letters + ']))'
+        self.max_end_of_word_letter_repetition = max_end_of_word_letter_repetition
+        neg_rep = '' if not self.max_letter_repetition else '(?!\\1{' + str(self.max_letter_repetition) + '})'
+        neg_end_rep = '' if not self.max_end_of_word_letter_repetition else '(?!\\1{' + str(self.max_end_of_word_letter_repetition) + ', }(?:$ |[^ '+self.hebrew_letters+']))'
+        self.word_pattern = '(?<![' + self.hebrew_letters + '][^\s-])\\b(?:(' + self.nonfinal_letter_geresh_pattern + ')'+ neg_rep + neg_end_rep +')+' + self.final_letter_geresh_pattern + '(?!\w)(?![^\s-][' + self.hebrew_letters + '])(?!-(?:$|[^' + self.hebrew_letters + ']))'
         self.mwe_pattern = '(?<!-)' + self.word_pattern + '(?:(?: ' + self.word_pattern.replace('\\1','\\2') + ')+'
         if max_mwe_hyphens != 0:
             self.mwe_pattern += '|(?:-' + self.word_pattern.replace('\\1','\\3') + '){1,'+('' if max_mwe_hyphens is None else str(max_mwe_hyphens))+'}'
