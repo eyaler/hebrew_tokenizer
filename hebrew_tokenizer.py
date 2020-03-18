@@ -24,7 +24,7 @@ class HebTokenizer:
         self.max_letter_repetition = max_letter_repetition
         self.max_end_of_word_letter_repetition = max_end_of_word_letter_repetition
         neg_rep = '' if not self.max_letter_repetition else '(?!\\1{' + str(self.max_letter_repetition) + '})'
-        neg_end_rep = '' if not self.max_end_of_word_letter_repetition else '(?!\\1{' + str(self.max_end_of_word_letter_repetition) + ', }(?:$ |[^ '+self.hebrew_letters+']))'
+        neg_end_rep = '' if not self.max_end_of_word_letter_repetition else '(?!\\1{' + str(self.max_end_of_word_letter_repetition) + ',}(?:$|[^'+self.hebrew_letters+']))'
         self.word_pattern = '(?<![' + self.hebrew_letters + '][^\s-])\\b(?:(' + self.nonfinal_letter_geresh_pattern + ')'+ neg_rep + neg_end_rep +')+' + self.final_letter_geresh_pattern + '(?!\w)(?![^\s-][' + self.hebrew_letters + '])(?!-(?:$|[^' + self.hebrew_letters + ']))'
         self.mwe_pattern = '(?<!-)' + self.word_pattern + '(?:(?: ' + self.word_pattern.replace('\\1','\\2') + ')+'
         if max_mwe_hyphens != 0:
