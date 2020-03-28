@@ -24,10 +24,10 @@ class HebTokenizer:
     clause_sep_before_space = sentence_sep + ':;,)"'
     clause_sep_after_space = '("'
     clause_sep_between_spaces = '-'
-    clause_pattern = '[' + clause_sep_before_space + '] | [' + clause_sep_after_space + ']| [' + clause_sep_between_spaces + '] '
+    clause_pattern = '\t|[' + clause_sep_before_space + ']\s|\s[' + clause_sep_after_space + ']|\s[' + clause_sep_between_spaces + ']\s'
     clause_regex = re.compile(clause_pattern)
     sentence_pattern = '[' + sentence_sep + '] '
-    sentence_pattern = re.compile(sentence_pattern)
+    sentence_regex = re.compile(sentence_pattern)
     CLAUSE = 1
     SENTENCE = 2
     LINE = 3
@@ -37,7 +37,7 @@ class HebTokenizer:
         self.max_end_of_word_letter_repetition = max_end_of_word_letter_repetition
         neg_rep = '' if not self.max_letter_repetition else '(?!\\1{' + str(self.max_letter_repetition) + '})'
         neg_end_rep = '' if not self.max_end_of_word_letter_repetition else '(?!\\1{' + str(self.max_end_of_word_letter_repetition) + ',}(?:$|[^'+self.hebrew_letters+']))'
-        self.word_pattern = '(?<![' + self.hebrew_letters + '][^ -])\\b(?:(' + self.nonfinal_letter_geresh_pattern + ')'+ neg_rep + neg_end_rep +')+' + self.final_letter_geresh_pattern + '(?!\w)(?![^ -][' + self.hebrew_letters + '])(?!-(?:$|[^' + self.hebrew_letters + ']))'
+        self.word_pattern = '(?<![' + self.hebrew_letters + '][^\s-])\\b(?:(' + self.nonfinal_letter_geresh_pattern + ')'+ neg_rep + neg_end_rep +')+' + self.final_letter_geresh_pattern + '(?!\w)(?![^\s-][' + self.hebrew_letters + '])(?!-(?:$|[^' + self.hebrew_letters + ']))'
         self.mwe_pattern = '(?<!-)' + self.word_pattern + '(?:(?: ' + self.word_pattern.replace('\\1','\\2') + ')+'
         if max_mwe_hyphens != 0:
             self.mwe_pattern += '|(?:-' + self.word_pattern.replace('\\1','\\3') + '){1,'+('' if max_mwe_hyphens is None else str(max_mwe_hyphens))+'}'
@@ -67,9 +67,6 @@ class HebTokenizer:
 
     def is_word_or_mwe(self, text):
         return self.is_word(text) or self.is_mwe(text)
-
-    def break_clauses(self, text):
-        return '\n'.join(self.clause_regex.split(text))
 
     def get_mwe(self, text, strict=None):
         text = self.sanitize(text)
