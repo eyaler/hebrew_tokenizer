@@ -1,56 +1,120 @@
+# A battle-tested Hebrew tokenizer (bible, twitter, opensubs) focused on multi-word expression extraction
+
 import re
 from unidecode import unidecode
 
 
+def cc(s):
+    return '[' + s + ']'
+
+def ncc(s):
+    return cc('^' + s)
+
+def ncg(s):
+    return '(?:' + s + ')'
+
+def nla(s):
+    return '(?!' + s + ')'
+
+def to_nonfinal(text):
+    return text.replace('ך', 'כ').replace('ם', 'מ').replace('ן', 'נ').replace('ף', 'פ').replace('ץ', 'צ')
+
+def to_final(text):
+    return text.replace('כ', 'ך').replace('מ', 'ם').replace('נ', 'ן').replace('פ', 'ף').replace('צ', 'ץ')
+
 class HebTokenizer:
-    # Nikud and teamim are ignored
-    # Correct usage of final letters (ךםןףץ) is enforced. Final פ is allowed.
-    # Same letter repetition (שולטתתתת), which is a common form of slang writing, is limited to a maximum of max_letter_repetition (default=3),
-    #   and at the end of words a maximum max_end_of_word_letter_repetition (default=2).
-    # Acronyms (צה"ל) and abbrevations ('וכו) are excluded.
-    # MWE refers to multi-word expression *candidates*, which are tokenized based on hyphen/makaf or surrounding punctuation.
-    # Hyphen-based MWE's are discarded if the contain more than max_mwe_hyphens (default=1).
-    # Strict mode enforces the absence of extraneous hebrew letters in the same "clause" (strict=CLAUSE), sentence (strict=SENTENCE) or line (strict=LINE) of the MWE.
+    '''
+    Nikud and Teamim are ignored.
+    Punctuation is normalized to ASCII (with unidecode).
+    Correct usage of final letters (ךםןףץ) is enforced. Final פ is allowed.
+    Same letter repetition (שולטתתתת), which is a common form of slang writing, is limited to a maximum of max_letter_repetition (default=2),
+        and at the end of words a maximum max_end_of_word_letter_repetition (default=2). Use 0 or None for no limit.
+        Note that these will throw away a very small number of legitimate repetitions, most notably 'מממ' as in 'מממן', 'מממשלת'.
+        allow_mmm (default=True) will specifically allow 'מממ' for the case max_letter_repetition==2.
+    Acronyms (צה"ל) and abbreviations ('וכו) are excluded. TBD: option to allow these.
+    MWE refers to multi-word expression *candidates*, which are tokenized based on hyphen/makaf or surrounding punctuation.
+    Hyphen-based MWE's are discarded if they contain more than max_mwe_hyphens (default=1). Use 0 not allowing hyphens or None for unlimited hyphens.
+    Line opening hyphens as used in conversation and enumeration, can be ignored by allow_line_opening_hyphens (default=True)
+    Strict mode can enforce the absence of extraneous hebrew letters in the same "clause" (strict=HebTokenizer.CLAUSE),
+        sentence (strict=HebTokenizer.SENTENCE) or line (strict=HebTokenizer.LINE) of the MWE. Use 0 or None to not be strict (default=None).
+    '''
 
     hebrew_diacritics = '\u0591-\u05bd\u05bf-\u05c2\u05c4\u05c5\u05c7' # all nikud and teamim except makaf, sof-pasuk, nun-hafukha
+    hebrew_diacritics_regex = re.compile(cc(hebrew_diacritics))
+
     hebrew_letters = 'א-ת'
     nonfinal_letters = 'אבגדהוזחטיכלמנסעפצקרשת'
-    final_letters = 'אבגדהוזחטיךלםןסעפףץקרשת'
+    final_letters = to_final(nonfinal_letters) + 'פ'
     nonfinal_letters_allowing_geresh = 'גזצ'
-    final_letters_allowing_geresh = 'גזץ'
-    nonfinal_letter_geresh_pattern = '(?:[' + nonfinal_letters_allowing_geresh + ']\'|[' + nonfinal_letters + '])'
-    final_letter_geresh_pattern = '(?:[' + final_letters_allowing_geresh + ']\'|[' + final_letters + '])'
+    final_letters_allowing_geresh = to_final(nonfinal_letters_allowing_geresh)
+    geresh = '\''
+    nonfinal_letter_geresh_pattern = ncg(cc(nonfinal_letters_allowing_geresh) + geresh + '|' + cc(nonfinal_letters))
+    final_letter_geresh_pattern = ncg(cc(final_letters_allowing_geresh) + geresh + '|' + cc(final_letters))
+    non_hebrew_letters_regex = re.compile(ncc(hebrew_letters) + '+')
+
     sentence_sep = '.?!'
     clause_sep_before_space = sentence_sep + ':;,)"'
     clause_sep_after_space = '("'
     clause_sep_between_spaces = '-'
-    clause_pattern = '\t|[' + clause_sep_before_space + ']\s|\s[' + clause_sep_after_space + ']|\s[' + clause_sep_between_spaces + ']\s'
-    clause_regex = re.compile(clause_pattern)
-    sentence_pattern = '[' + sentence_sep + '] '
-    sentence_regex = re.compile(sentence_pattern)
+    clause_sep_pattern = '\t|' + cc(clause_sep_before_space) + '\s|\s' + cc(clause_sep_after_space) + '|\s' + cc(clause_sep_between_spaces) + '\s'
+    clause_sep_regex = re.compile(clause_sep_pattern)
+    sentence_sep_regex = re.compile(cc(sentence_sep))
+
+    mwe_words_sep = ' -'
+    mwe_words_sep_regex = re.compile(cc(mwe_words_sep))
+
+    mmm_pattern = '(?<!(?<!m)mmm)'.replace('m', 'מ')
+    line_opening_hyphen_pattern = '((?:^|\n|\r)\s*-{1,2})'
+    line_opening_hyphen_regex = re.compile(line_opening_hyphen_pattern, flags=re.MULTILINE)
+
     CLAUSE = 1
     SENTENCE = 2
     LINE = 3
 
-    def __init__(self, max_letter_repetition=3, max_end_of_word_letter_repetition=2, max_mwe_hyphens=1):
+    default_max_letter_repetition = 2
+    default_max_end_of_word_letter_repetition = 2
+    default_allow_mmm = True
+    default_max_mwe_hyphens = 1
+    default_allow_line_opening_hyphens = True
+    default_strict = None
+
+
+    def __init__(self, max_letter_repetition=default_max_letter_repetition, max_end_of_word_letter_repetition=default_max_end_of_word_letter_repetition, allow_mmm=default_allow_mmm, max_mwe_hyphens=default_max_mwe_hyphens, allow_line_opening_hyphens=default_allow_line_opening_hyphens):
         self.max_letter_repetition = max_letter_repetition
         self.max_end_of_word_letter_repetition = max_end_of_word_letter_repetition
-        neg_rep = '' if not self.max_letter_repetition else '(?!\\1{' + str(self.max_letter_repetition) + '})'
-        neg_end_rep = '' if not self.max_end_of_word_letter_repetition else '(?!\\1{' + str(self.max_end_of_word_letter_repetition) + ',}(?:$|[^'+self.hebrew_letters+']))'
-        self.word_pattern = '(?<![' + self.hebrew_letters + '][^\s-])\\b(?:(' + self.nonfinal_letter_geresh_pattern + ')'+ neg_rep + neg_end_rep +')+' + self.final_letter_geresh_pattern + '(?!\w)(?![^\s-][' + self.hebrew_letters + '])(?!-(?:$|[^' + self.hebrew_letters + ']))'
-        self.mwe_pattern = '(?<!-)' + self.word_pattern + '(?:(?: ' + self.word_pattern.replace('\\1','\\2') + ')+'
+        self.allow_mmm = allow_mmm
+        self.max_mwe_hyphens = max_mwe_hyphens
+        self.allow_line_opening_hyphens = allow_line_opening_hyphens
+
+        mmm = ''
+        neg_rep = ''
+        neg_end_rep = ''
+        if max_letter_repetition == 2 and allow_mmm:
+            mmm = self.mmm_pattern
+        if max_letter_repetition:
+            neg_rep = nla('\\1{' + str(max_letter_repetition) + '}' + mmm)
+        if max_end_of_word_letter_repetition:
+            neg_end_rep = nla('\\1{' + str(max_end_of_word_letter_repetition) + ',}' + ncg('$|' + ncc(self.hebrew_letters)))
+        self.word_pattern = '(?<!' + cc(self.hebrew_letters) + '[^\s-])\\b' + ncg('(' + self.nonfinal_letter_geresh_pattern + ')' + neg_rep + neg_end_rep) + '+' + self.final_letter_geresh_pattern + '(?!\w)'+nla('[^\s-]' + cc(self.hebrew_letters)) + nla('-' + ncg('$|' + ncc(self.hebrew_letters)))
+
+        max_mwe_hyphens_pattern = ''
         if max_mwe_hyphens != 0:
-            self.mwe_pattern += '|(?:-' + self.word_pattern.replace('\\1','\\3') + '){1,'+('' if max_mwe_hyphens is None else str(max_mwe_hyphens))+'}'
-        self.mwe_pattern += ')(?!-)'
-        self.line_with_strict_mwe_pattern = '^[^' + self.hebrew_letters + ']*' + self.mwe_pattern + '[^' + self.hebrew_letters + ']*$'
+            max_mwe_hyphens_str = ''
+            if max_mwe_hyphens is not None:
+                max_mwe_hyphens_str = str(max_mwe_hyphens)
+            max_mwe_hyphens_pattern = '|' + ncg('-' + self.word_pattern.replace('\\1', '\\3')) + '{1,' + max_mwe_hyphens_str + '}'
+        self.mwe_pattern = '(?<!-)' + self.word_pattern + ncg(ncg(' ' + self.word_pattern.replace('\\1', '\\2')) + '+' + max_mwe_hyphens_pattern) + '(?!-)'
+        self.line_with_strict_mwe_pattern = '^' + ncc(self.hebrew_letters) + '*' + self.mwe_pattern + ncc(self.hebrew_letters) + '*$'
 
         self.word_regex = re.compile(self.word_pattern)
         self.mwe_regex = re.compile(self.mwe_pattern)
         self.line_with_strict_mwe_regex = re.compile(self.line_with_strict_mwe_pattern, flags=re.MULTILINE)
 
     def sanitize(self, text):
-        text = re.sub('[' + self.hebrew_diacritics + ']', '', text)
-        text = re.sub('[^' + self.hebrew_letters + ']+', lambda x: unidecode(x.group()), text)
+        text = self.hebrew_diacritics_regex.sub('', text)
+        text = self.non_hebrew_letters_regex.sub(lambda x: unidecode(x.group()), text)
+        if self.allow_line_opening_hyphens:
+            text = self.line_opening_hyphen_regex.sub('\\1 ', text)
         return text
 
     def is_word(self, text):
@@ -68,18 +132,21 @@ class HebTokenizer:
     def is_word_or_mwe(self, text):
         return self.is_word(text) or self.is_mwe(text)
 
-    def get_mwe(self, text, strict=None):
+    def get_mwe(self, text, strict=default_strict):
         text = self.sanitize(text)
         if strict:
             if strict == self.CLAUSE:
-                text = '\n'.join(self.clause_regex.split(text))
+                text = '\n'.join(self.clause_sep_regex.split(text))
             elif strict == self.SENTENCE:
-                text = '\n'.join(self.sentence_regex.split(text))
-            return [self.mwe_regex.search(match.group()).group() for match in self.line_with_strict_mwe_regex.finditer(text)]
+                text = '\n'.join(self.sentence_sep_regex.split(text))
+            else:
+                assert strict == self.LINE, 'Unknown strict mode: %s'%strict
+            return [self.mwe_regex.search(match.group()).group() for match in
+                    self.line_with_strict_mwe_regex.finditer(text)]
         return [match.group() for match in self.mwe_regex.finditer(text)]
 
-    def get_mwe_words(self, text, strict=None):
-        return [re.split('[ -]', mwe) for mwe in self.get_mwe(text, strict=strict)]
+    def get_mwe_words(self, text, strict=default_strict):
+        return [self.mwe_words_sep_regex.split(mwe) for mwe in self.get_mwe(text, strict=strict)]
 
 
 if __name__ == '__main__':
