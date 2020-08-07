@@ -64,7 +64,7 @@ class HebTokenizer:
     mwe_words_sep_regex = re.compile(cc(mwe_words_sep))
 
     mmm_pattern = '(?<!(?<!m)mmm)'.replace('m', 'מ')
-    line_opening_hyphen_pattern = '((?:^|\n|\r)\s*-{1,2})'
+    line_opening_hyphen_pattern = '((?:^|\n|\r)\s*-{1,2})(?=\w)'
     line_opening_hyphen_regex = re.compile(line_opening_hyphen_pattern, flags=re.MULTILINE)
 
     CLAUSE = 1
