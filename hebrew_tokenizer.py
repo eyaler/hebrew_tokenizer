@@ -1,4 +1,4 @@
-# A battle-tested Hebrew tokenizer (bible, twitter, opensubs) focused on multi-word expression extraction
+# A battle-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs) focused on multi-word expression extraction.
 
 import re
 from unidecode import unidecode
@@ -25,7 +25,7 @@ def to_final(text):
 class HebTokenizer:
     '''
     Nikud and Teamim are ignored.
-    Punctuation is normalized to ASCII (with unidecode).
+    Punctuation is normalized to ASCII (using unidecode).
     Correct usage of final letters (ךםןףץ) is enforced. Final פ is allowed.
     Same letter repetition (שולטתתתת), which is a common form of slang writing, is limited to a maximum of max_letter_repetition (default=2),
         and at the end of words a maximum max_end_of_word_letter_repetition (default=2). Use 0 or None for no limit.
@@ -121,9 +121,17 @@ class HebTokenizer:
         text = self.sanitize(text)
         return self.word_regex.fullmatch(text) is not None
 
-    def get_words(self, text):
+    def get_words(self, text, generator=False):
         text = self.sanitize(text)
-        return [match.group() for match in self.word_regex.finditer(text)]
+        result = (match.group() for match in self.word_regex.finditer(text))
+        if not generator:
+            result = list(result)
+        return result
+
+    def has_word(self, text):
+        for word in self.get_words(text, generator=True):
+            return True
+        return False
 
     def is_mwe(self, text):
         text = self.sanitize(text)
@@ -132,7 +140,7 @@ class HebTokenizer:
     def is_word_or_mwe(self, text):
         return self.is_word(text) or self.is_mwe(text)
 
-    def get_mwe(self, text, strict=default_strict):
+    def get_mwe(self, text, strict=default_strict, generator=False):
         text = self.sanitize(text)
         if strict:
             if strict == self.CLAUSE:
@@ -141,12 +149,19 @@ class HebTokenizer:
                 text = '\n'.join(self.sentence_sep_regex.split(text))
             else:
                 assert strict == self.LINE, 'Unknown strict mode: %s'%strict
-            return [self.mwe_regex.search(match.group()).group() for match in
-                    self.line_with_strict_mwe_regex.finditer(text)]
-        return [match.group() for match in self.mwe_regex.finditer(text)]
+            result = (self.mwe_regex.search(match.group()).group() for match in
+                    self.line_with_strict_mwe_regex.finditer(text))
+        else:
+            result = (match.group() for match in self.mwe_regex.finditer(text))
+        if not generator:
+            result = list(result)
+        return result
 
-    def get_mwe_words(self, text, strict=default_strict):
-        return [self.mwe_words_sep_regex.split(mwe) for mwe in self.get_mwe(text, strict=strict)]
+    def get_mwe_words(self, text, strict=default_strict, generator=False):
+        result = (self.mwe_words_sep_regex.split(mwe) for mwe in self.get_mwe(text, strict=strict))
+        if not generator:
+            result = list(result)
+        return result
 
 
 if __name__ == '__main__':
@@ -159,5 +174,6 @@ if __name__ == '__main__':
     print_with_len(text)
     print_with_len(heb_tokenizer.sanitize(text))
     print_with_len(heb_tokenizer.get_words(text))
+    print('has_word=%s'%heb_tokenizer.has_word(text))
     print_with_len(heb_tokenizer.get_mwe(text))
     print_with_len(heb_tokenizer.get_mwe_words(text))
