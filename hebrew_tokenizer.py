@@ -1,8 +1,7 @@
 # A battle-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs) focused on multi-word expression extraction.
 
 import re
-from unidecode import unidecode
-
+from unidecode import unidecode_expect_nonascii
 
 def cc(s):
     return '[' + s + ']'
@@ -26,12 +25,12 @@ class HebTokenizer:
     '''
     Nikud and Teamim are ignored.
     Punctuation is normalized to ASCII (using unidecode).
-    Correct usage of final letters (ךםןףץ) is enforced. Final פ is allowed.
+    Correct usage of final letters (ךםןףץ) is enforced. Final פ and 'צ (with geresh) are allowed.
     Same letter repetition (שולטתתתת), which is a common form of slang writing, is limited to a maximum of max_letter_repetition (default=2),
         and at the end of words a maximum max_end_of_word_letter_repetition (default=2). Use 0 or None for no limit.
         Note that these will throw away a very small number of legitimate repetitions, most notably 'מממ' as in 'מממן', 'מממשלת'.
         allow_mmm (default=True) will specifically allow 'מממ' for the case max_letter_repetition==2.
-    Acronyms (צה"ל) and abbreviations ('וכו) are excluded. TBD: option to allow these.
+    Acronyms (צה"ל) and abbreviations ('וכו) are excluded, as well as numerals (42). (TBD)
     MWE refers to multi-word expression *candidates*, which are tokenized based on hyphen/makaf or surrounding punctuation.
     Hyphen-based MWE's are discarded if they contain more than max_mwe_hyphens (default=1). Use 0 not allowing hyphens or None for unlimited hyphens.
     Line opening hyphens as used in conversation and enumeration, can be ignored by allow_line_opening_hyphens (default=True)
@@ -46,11 +45,12 @@ class HebTokenizer:
     nonfinal_letters = 'אבגדהוזחטיכלמנסעפצקרשת'
     final_letters = to_final(nonfinal_letters) + 'פ'
     nonfinal_letters_allowing_geresh = 'גזצ'
-    final_letters_allowing_geresh = to_final(nonfinal_letters_allowing_geresh)
+    final_letters_allowing_geresh = to_final(nonfinal_letters_allowing_geresh) + 'צ'
     geresh = '\''
     nonfinal_letter_geresh_pattern = ncg(cc(nonfinal_letters_allowing_geresh) + geresh + '|' + cc(nonfinal_letters))
     final_letter_geresh_pattern = ncg(cc(final_letters_allowing_geresh) + geresh + '|' + cc(final_letters))
     non_hebrew_letters_regex = re.compile(ncc(hebrew_letters) + '+')
+    bad_final_regex = re.compile(cc('ךםןףץ')+cc(hebrew_letters))
 
     sentence_sep = '.?!'
     clause_sep_before_space = sentence_sep + ':;,)"'
@@ -110,16 +110,20 @@ class HebTokenizer:
         self.mwe_regex = re.compile(self.mwe_pattern)
         self.line_with_strict_mwe_regex = re.compile(self.line_with_strict_mwe_pattern, flags=re.MULTILINE)
 
-    def sanitize(self, text):
-        text = self.hebrew_diacritics_regex.sub('', text)
-        text = self.non_hebrew_letters_regex.sub(lambda x: unidecode(x.group()), text)
-        if self.allow_line_opening_hyphens:
-            text = self.line_opening_hyphen_regex.sub('\\1 ', text)
-        return text
+    @staticmethod
+    def sanitize(text):
+        text = HebTokenizer.hebrew_diacritics_regex.sub('', text)
+        text = text.replace('\u05C6','|') # https://github.com/avian2/unidecode/issues/66
+        return HebTokenizer.non_hebrew_letters_regex.sub(lambda x: unidecode_expect_nonascii(x.group(), errors='preserve'), text)
+
+    @staticmethod
+    def has_bad_final(text): # this could be helpful to detect text containing badly fused words
+        text = HebTokenizer.hebrew_diacritics_regex.sub('', text)
+        return bool(HebTokenizer.bad_final_regex.search(text))
 
     def is_word(self, text):
         text = self.sanitize(text)
-        return self.word_regex.fullmatch(text) is not None
+        return bool(self.word_regex.fullmatch(text))
 
     def get_words(self, text, generator=False):
         text = self.sanitize(text)
@@ -129,26 +133,28 @@ class HebTokenizer:
         return result
 
     def has_word(self, text):
-        for word in self.get_words(text, generator=True):
+        for _ in self.get_words(text, generator=True):
             return True
         return False
 
     def is_mwe(self, text):
         text = self.sanitize(text)
-        return self.mwe_regex.fullmatch(text) is not None
+        return bool(self.mwe_regex.fullmatch(text))
 
     def is_word_or_mwe(self, text):
         return self.is_word(text) or self.is_mwe(text)
 
     def get_mwe(self, text, strict=default_strict, generator=False):
         text = self.sanitize(text)
+        if self.allow_line_opening_hyphens:
+            text = self.line_opening_hyphen_regex.sub('\\1 ', text)
         if strict:
             if strict == self.CLAUSE:
                 text = '\n'.join(self.clause_sep_regex.split(text))
             elif strict == self.SENTENCE:
                 text = '\n'.join(self.sentence_sep_regex.split(text))
             else:
-                assert strict == self.LINE, 'Unknown strict mode: %s'%strict
+                assert strict == self.LINE, f'Unknown strict mode: {strict}'
             result = (self.mwe_regex.search(match.group()).group() for match in
                     self.line_with_strict_mwe_regex.finditer(text))
         else:
@@ -163,17 +169,20 @@ class HebTokenizer:
             result = list(result)
         return result
 
+sanitize = HebTokenizer.sanitize
 
 if __name__ == '__main__':
+
     text = 'א בְּרֵאשִׁ֖ית בָּרָ֣א אֱלֹהִ֑ים אֵ֥ת הַשָּׁמַ֖יִם וְאֵ֥ת הָאָֽרֶץ. ב וְהָאָ֗רֶץ הָיְתָ֥ה תֹ֙הוּ֙ וָבֹ֔הוּ וְחֹ֖שֶׁךְ עַל־פְּנֵ֣י תְה֑וֹם, וְר֣וּחַ אֱלֹהִ֔ים מְרַחֶ֖פֶת עַל־פְּנֵ֥י הַמָּֽיִם. ג וַיֹּ֥אמֶר אֱלֹהִ֖ים: "יְהִ֣י א֑וֹר", וַֽיְהִי־אֽוֹר. ד וַיַּ֧רְא אֱלֹהִ֛ים אֶת־הָא֖וֹר כִּי־ט֑וֹב, וַיַּבְדֵּ֣ל אֱלֹהִ֔ים בֵּ֥ין הָא֖וֹר וּבֵ֥ין הַחֹֽשֶׁךְ. ה וַיִּקְרָ֨א אֱלֹהִ֤ים לָאוֹר֙ "י֔וֹם" וְלַחֹ֖שֶׁךְ קָ֣רָא "לָ֑יְלָה", וַֽיְהִי־עֶ֥רֶב וַֽיְהִי־בֹ֖קֶר י֥וֹם אֶחָֽד.'
 
     def print_with_len(lst):
         print(lst, len(lst))
 
-    heb_tokenizer = HebTokenizer()
     print_with_len(text)
+    print_with_len(sanitize(text))
+    heb_tokenizer = HebTokenizer()
     print_with_len(heb_tokenizer.sanitize(text))
     print_with_len(heb_tokenizer.get_words(text))
-    print('has_word=%s'%heb_tokenizer.has_word(text))
+    print(f'has_word={heb_tokenizer.has_word(text)}')
     print_with_len(heb_tokenizer.get_mwe(text))
     print_with_len(heb_tokenizer.get_mwe_words(text))
