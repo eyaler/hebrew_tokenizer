@@ -163,8 +163,19 @@ class HebTokenizer:
             result = list(result)
         return result
 
-    def get_mwe_words(self, text, strict=default_strict, generator=False):
+    def get_mwe_words(self, text, strict=default_strict, generator=False, flat=False):
         result = (self.mwe_words_sep_regex.split(mwe) for mwe in self.get_mwe(text, strict=strict))
+        if flat:
+            result = (word for word_list in result for word in word_list)
+        if not generator:
+            result = list(result)
+        return result
+
+    def get_mwe_bigrams(self, text, strict=default_strict, generator=False, flat=False):
+        words = self.get_mwe_words(text, strict=strict, generator=generator, flat=False)
+        result = ([(word_list[i],word_list[i+1]) for i in range(len(word_list)-1)] for word_list in words)
+        if flat:
+            result = (bigram for bigram_list in result for bigram in bigram_list)
         if not generator:
             result = list(result)
         return result
@@ -186,3 +197,6 @@ if __name__ == '__main__':
     print(f'has_word={heb_tokenizer.has_word(text)}')
     print_with_len(heb_tokenizer.get_mwe(text))
     print_with_len(heb_tokenizer.get_mwe_words(text))
+    print_with_len(heb_tokenizer.get_mwe_words(text, flat=True))
+    print_with_len(heb_tokenizer.get_mwe_bigrams(text))
+    print_with_len(heb_tokenizer.get_mwe_bigrams(text, flat=True))
