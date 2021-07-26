@@ -113,6 +113,7 @@ class HebTokenizer:
     @staticmethod
     def sanitize(text):
         text = HebTokenizer.hebrew_diacritics_regex.sub('', text)
+        text = text.replace('\u05C3','. ') # deal with sof-pasuk for biblical texts
         return HebTokenizer.non_hebrew_letters_regex.sub(lambda x: unidecode_expect_nonascii(x.group(), errors='preserve'), text)
 
     @staticmethod
