@@ -113,7 +113,6 @@ class HebTokenizer:
     @staticmethod
     def sanitize(text):
         text = HebTokenizer.hebrew_diacritics_regex.sub('', text)
-        text = text.replace('\u05C6','|') # https://github.com/avian2/unidecode/issues/66
         return HebTokenizer.non_hebrew_letters_regex.sub(lambda x: unidecode_expect_nonascii(x.group(), errors='preserve'), text)
 
     @staticmethod
