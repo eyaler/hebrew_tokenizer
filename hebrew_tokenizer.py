@@ -117,7 +117,7 @@ class HebTokenizer:
         return HebTokenizer.non_hebrew_letters_regex.sub(lambda x: unidecode_expect_nonascii(x.group(), errors='preserve'), text)
 
     @staticmethod
-    def has_bad_final(text): # this could be helpful to detect text containing badly fused words
+    def has_bad_final(text): # this could be helpful to detect text containing badly fused words. watch out from applying this to biblical texts.
         text = HebTokenizer.hebrew_diacritics_regex.sub('', text)
         return bool(HebTokenizer.bad_final_regex.search(text))
 
@@ -163,7 +163,7 @@ class HebTokenizer:
             result = list(result)
         return result
 
-    def get_mwe_words(self, text, strict=default_strict, generator=False, flat=False):
+    def get_mwe_words(self, text, strict=default_strict, flat=False, generator=False):
         result = (self.mwe_words_sep_regex.split(mwe) for mwe in self.get_mwe(text, strict=strict))
         if flat:
             result = (word for word_list in result for word in word_list)
@@ -171,9 +171,9 @@ class HebTokenizer:
             result = list(result)
         return result
 
-    def get_mwe_bigrams(self, text, strict=default_strict, generator=False, flat=False):
-        words = self.get_mwe_words(text, strict=strict, generator=generator, flat=False)
-        result = ([(word_list[i],word_list[i+1]) for i in range(len(word_list)-1)] for word_list in words)
+    def get_mwe_bigrams(self, text, strict=default_strict, as_strings=False, flat=False, generator=False):
+        words = self.get_mwe_words(text, strict=strict, flat=False, generator=generator)
+        result = ([word_list[i]+' '+word_list[i+1] if as_strings else (word_list[i],word_list[i+1]) for i in range(len(word_list)-1)] for word_list in words)
         if flat:
             result = (bigram for bigram_list in result for bigram in bigram_list)
         if not generator:
@@ -199,4 +199,6 @@ if __name__ == '__main__':
     print_with_len(heb_tokenizer.get_mwe_words(text))
     print_with_len(heb_tokenizer.get_mwe_words(text, flat=True))
     print_with_len(heb_tokenizer.get_mwe_bigrams(text))
+    print_with_len(heb_tokenizer.get_mwe_bigrams(text, as_strings=True))
     print_with_len(heb_tokenizer.get_mwe_bigrams(text, flat=True))
+    print_with_len(heb_tokenizer.get_mwe_bigrams(text, as_strings=True, flat=True))
