@@ -1,6 +1,7 @@
 # A battle-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs) focused on multi-word expression extraction.
 
 import re
+from functools import partialmethod
 from unidecode import unidecode_expect_nonascii
 
 def cc(s):
@@ -171,14 +172,16 @@ class HebTokenizer:
             result = list(result)
         return result
 
-    def get_mwe_bigrams(self, text, strict=default_strict, as_strings=False, flat=False, generator=False):
+    def get_mwe_ngrams(self, text, n, strict=default_strict, as_strings=False, flat=False, generator=False):
         words = self.get_mwe_words(text, strict=strict, flat=False, generator=generator)
-        result = ([word_list[i]+' '+word_list[i+1] if as_strings else (word_list[i],word_list[i+1]) for i in range(len(word_list)-1)] for word_list in words)
+        result = ([' '.join(word_list[i:i+n]) if as_strings else tuple(word_list[i:i+n]) for i in range(len(word_list)-n+1)] for word_list in words if len(word_list)>=n)
         if flat:
-            result = (bigram for bigram_list in result for bigram in bigram_list)
+            result = (ngram for ngram_list in result for ngram in ngram_list)
         if not generator:
             result = list(result)
         return result
+
+    get_mwe_bigrams = partialmethod(get_mwe_ngrams, n=2)
 
 sanitize = HebTokenizer.sanitize
 
@@ -202,3 +205,7 @@ if __name__ == '__main__':
     print_with_len(heb_tokenizer.get_mwe_bigrams(text, as_strings=True))
     print_with_len(heb_tokenizer.get_mwe_bigrams(text, flat=True))
     print_with_len(heb_tokenizer.get_mwe_bigrams(text, as_strings=True, flat=True))
+    print_with_len(heb_tokenizer.get_mwe_ngrams(text, n=3))
+    print_with_len(heb_tokenizer.get_mwe_ngrams(text, n=3, as_strings=True))
+    print_with_len(heb_tokenizer.get_mwe_ngrams(text, n=3, flat=True))
+    print_with_len(heb_tokenizer.get_mwe_ngrams(text, n=3, as_strings=True, flat=True))
