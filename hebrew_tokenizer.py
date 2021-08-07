@@ -51,7 +51,7 @@ class HebTokenizer:
     nonfinal_letter_geresh_pattern = ncg(cc(nonfinal_letters_allowing_geresh) + geresh + '|' + cc(nonfinal_letters))
     final_letter_geresh_pattern = ncg(cc(final_letters_allowing_geresh) + geresh + '|' + cc(final_letters))
     non_hebrew_letters_regex = re.compile(ncc(hebrew_letters) + '+')
-    bad_final_regex = re.compile(cc('ךםןףץ')+cc(hebrew_letters))
+    bad_final_regex = re.compile(cc('ךםןףץ')+cc(nonfinal_letters))
 
     sentence_sep = '.?!'
     clause_sep_before_space = sentence_sep + ':;,)"'
