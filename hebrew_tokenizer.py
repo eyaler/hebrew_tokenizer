@@ -118,7 +118,7 @@ class HebTokenizer:
         return HebTokenizer.non_hebrew_letters_regex.sub(lambda x: unidecode_expect_nonascii(x.group(), errors='preserve'), text)
 
     @staticmethod
-    def check_bad_final(text, ret_all=False): # this could be helpful to detect text containing badly fused words. watch out from applying this to biblical texts.
+    def find_bad_final(text, ret_all=False): # this could be helpful to detect text containing badly fused words. watch out from applying this to biblical texts.
         text = HebTokenizer.hebrew_diacritics_regex.sub('', text)
         if ret_all:
             return HebTokenizer.bad_final_regex.findall(text)
