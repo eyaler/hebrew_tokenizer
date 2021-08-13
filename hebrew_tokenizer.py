@@ -78,6 +78,7 @@ class HebTokenizer:
     default_max_mwe_hyphens = 1
     default_allow_line_opening_hyphens = True
     default_strict = None
+    default_bad_final_exceptions = ['לםרבה', 'יוםיום', 'סוףסוף']
 
 
     def __init__(self, max_letter_repetition=default_max_letter_repetition, max_end_of_word_letter_repetition=default_max_end_of_word_letter_repetition, allow_mmm=default_allow_mmm, max_mwe_hyphens=default_max_mwe_hyphens, allow_line_opening_hyphens=default_allow_line_opening_hyphens):
@@ -118,37 +119,45 @@ class HebTokenizer:
         return HebTokenizer.non_hebrew_letters_regex.sub(lambda x: unidecode_expect_nonascii(x.group(), errors='preserve'), text)
 
     @staticmethod
-    def find_bad_final(text, ret_all=False): # this could be helpful to detect text containing badly fused words. watch out from applying this to biblical texts.
+    def find_bad_final(text, bad_final_exceptions=default_bad_final_exceptions, ret_all=False): # this could be help detect text containing badly fused words or lines
         text = HebTokenizer.hebrew_diacritics_regex.sub('', text)
+        for x in bad_final_exceptions or []:
+            text = text.repace(x, '')
         if ret_all:
             return HebTokenizer.bad_final_regex.findall(text)
         return HebTokenizer.bad_final_regex.search(text)
 
-    def is_word(self, text):
-        text = self.sanitize(text)
+    def is_word(self, text, sanitize=True):
+        if sanitize:
+            text = self.sanitize(text)
         return bool(self.word_regex.fullmatch(text))
 
-    def get_words(self, text, generator=False):
-        text = self.sanitize(text)
+    def get_words(self, text, sanitize=True, generator=False):
+        if sanitize:
+            text = self.sanitize(text)
         result = (match.group() for match in self.word_regex.finditer(text))
         if not generator:
             result = list(result)
         return result
 
-    def has_word(self, text):
-        for _ in self.get_words(text, generator=True):
+    def has_word(self, text, sanitize=True):
+        for _ in self.get_words(text, sanitize=sanitize, generator=True):
             return True
         return False
 
-    def is_mwe(self, text):
-        text = self.sanitize(text)
+    def is_mwe(self, text, sanitize=True):
+        if sanitize:
+            text = self.sanitize(text)
         return bool(self.mwe_regex.fullmatch(text))
 
-    def is_word_or_mwe(self, text):
-        return self.is_word(text) or self.is_mwe(text)
+    def is_word_or_mwe(self, text, sanitize=True):
+        if sanitize:
+            text = self.sanitize(text)
+        return self.is_word(text, sanitize=False) or self.is_mwe(text, sanitize=False)
 
-    def get_mwe(self, text, strict=default_strict, generator=False):
-        text = self.sanitize(text)
+    def get_mwe(self, text, sanitize=True, strict=default_strict, generator=False):
+        if sanitize:
+            text = self.sanitize(text)
         if self.allow_line_opening_hyphens:
             text = self.line_opening_hyphen_regex.sub('\\1 ', text)
         if strict:
@@ -166,16 +175,16 @@ class HebTokenizer:
             result = list(result)
         return result
 
-    def get_mwe_words(self, text, strict=default_strict, flat=False, generator=False):
-        result = (self.mwe_words_sep_regex.split(mwe) for mwe in self.get_mwe(text, strict=strict))
+    def get_mwe_words(self, text, sanitize=True, strict=default_strict, flat=False, generator=False):
+        result = (self.mwe_words_sep_regex.split(mwe) for mwe in self.get_mwe(text, sanitize=sanitize, strict=strict))
         if flat:
             result = (word for word_list in result for word in word_list)
         if not generator:
             result = list(result)
         return result
 
-    def get_mwe_ngrams(self, text, n, strict=default_strict, as_strings=False, flat=False, generator=False):
-        words = self.get_mwe_words(text, strict=strict, flat=False, generator=generator)
+    def get_mwe_ngrams(self, text, n, sanitize=True, strict=default_strict, as_strings=False, flat=False, generator=False):
+        words = self.get_mwe_words(text, sanitize=sanitize, strict=strict, flat=False, generator=generator)
         result = ([' '.join(word_list[i:i+n]) if as_strings else tuple(word_list[i:i+n]) for i in range(len(word_list)-n+1)] for word_list in words if len(word_list)>=n)
         if flat:
             result = (ngram for ngram_list in result for ngram in ngram_list)
