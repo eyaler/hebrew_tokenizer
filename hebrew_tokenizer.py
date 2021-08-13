@@ -113,16 +113,22 @@ class HebTokenizer:
         self.line_with_strict_mwe_regex = re.compile(self.line_with_strict_mwe_pattern, flags=re.MULTILINE)
 
     @staticmethod
-    def sanitize(text):
-        text = HebTokenizer.hebrew_diacritics_regex.sub('', text)
+    def remove_diacritics(text):
+        return HebTokenizer.hebrew_diacritics_regex.sub('', text)
+
+    @staticmethod
+    def sanitize(text, remove_diacritics=True):
+        if remove_diacritics:
+            text = HebTokenizer.remove_diacritics(text)
         text = text.replace('\u05C3','. ') # deal with sof-pasuk for biblical texts
         return HebTokenizer.non_hebrew_letters_regex.sub(lambda x: unidecode_expect_nonascii(x.group(), errors='preserve'), text)
 
     @staticmethod
-    def find_bad_final(text, bad_final_exceptions=default_bad_final_exceptions, ret_all=False): # this could be help detect text containing badly fused words or lines
-        text = HebTokenizer.hebrew_diacritics_regex.sub('', text)
+    def find_bad_final(text, remove_diacritics=True, bad_final_exceptions=default_bad_final_exceptions, ret_all=False): # this could be help detect text containing badly fused words or lines
+        if remove_diacritics:
+            text = HebTokenizer.remove_diacritics(text)
         for x in bad_final_exceptions or []:
-            text = text.repace(x, '')
+            text = text.replace(x, '')
         if ret_all:
             return HebTokenizer.bad_final_regex.findall(text)
         return HebTokenizer.bad_final_regex.search(text)
@@ -209,6 +215,7 @@ if __name__ == '__main__':
     print_with_len(heb_tokenizer.sanitize(text))
     print_with_len(heb_tokenizer.get_words(text))
     print(f'has_word={heb_tokenizer.has_word(text)}')
+    print(f'bad_final={heb_tokenizer.find_bad_final(text)}')
     print_with_len(heb_tokenizer.get_mwe(text))
     print_with_len(heb_tokenizer.get_mwe_words(text))
     print_with_len(heb_tokenizer.get_mwe_words(text, flat=True))
