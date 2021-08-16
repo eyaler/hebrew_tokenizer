@@ -1,4 +1,4 @@
-# A battle-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs) focused on multi-word expression extraction.
+# A battle-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs, oscar, cc100, mc4) focused on multi-word expression extraction.
 
 import re
 from functools import partialmethod
@@ -124,7 +124,7 @@ class HebTokenizer:
         return HebTokenizer.non_hebrew_letters_regex.sub(lambda x: unidecode_expect_nonascii(x.group(), errors='preserve'), text)
 
     @staticmethod
-    def find_bad_final(text, remove_diacritics=True, bad_final_exceptions=default_bad_final_exceptions, ret_all=False): # this could be help detect text containing badly fused words or lines
+    def find_bad_final(text, remove_diacritics=True, bad_final_exceptions=default_bad_final_exceptions, ret_all=False): # this could help detect text containing badly fused words or lines
         if remove_diacritics:
             text = HebTokenizer.remove_diacritics(text)
         for x in bad_final_exceptions or []:
