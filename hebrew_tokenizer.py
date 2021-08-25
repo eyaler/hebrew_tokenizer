@@ -16,11 +16,13 @@ def ncg(s):
 def nla(s):
     return '(?!' + s + ')'
 
+to_nonfinal_table = str.maketrans('ךםןףץ', 'כמנפצ')
 def to_nonfinal(text):
-    return text.replace('ך', 'כ').replace('ם', 'מ').replace('ן', 'נ').replace('ף', 'פ').replace('ץ', 'צ')
+    return text.translate(to_nonfinal_table)
 
+to_final_table = str.maketrans('כמנפצ', 'ךםןףץ')
 def to_final(text):
-    return text.replace('כ', 'ך').replace('מ', 'ם').replace('נ', 'ן').replace('פ', 'ף').replace('צ', 'ץ')
+    return text.translate(to_final_table)
 
 class HebTokenizer:
     '''
