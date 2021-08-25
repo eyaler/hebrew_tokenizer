@@ -4,6 +4,7 @@ import re
 from functools import partialmethod
 from unidecode import unidecode_expect_nonascii
 
+
 def cc(s):
     return '[' + s + ']'
 
@@ -16,13 +17,11 @@ def ncg(s):
 def nla(s):
     return '(?!' + s + ')'
 
-to_nonfinal_table = str.maketrans('ךםןףץ', 'כמנפצ')
-def to_nonfinal(text):
-    return text.translate(to_nonfinal_table)
+final_chars = 'ךםןףץ'
+nonfinal_chars = 'כמנפצ'
+to_nonfinal_table = str.maketrans(final_chars, nonfinal_chars)
+to_final_table = str.maketrans(nonfinal_chars, final_chars)
 
-to_final_table = str.maketrans('כמנפצ', 'ךםןףץ')
-def to_final(text):
-    return text.translate(to_final_table)
 
 class HebTokenizer:
     '''
@@ -41,19 +40,27 @@ class HebTokenizer:
         sentence (strict=HebTokenizer.SENTENCE) or line (strict=HebTokenizer.LINE) of the MWE. Use 0 or None to not be strict (default=None).
     '''
 
+    @staticmethod
+    def to_nonfinal(text):
+        return text.translate(to_nonfinal_table)
+
+    @staticmethod
+    def to_final(text):
+        return text.translate(to_final_table)
+
     hebrew_diacritics = '\u0591-\u05bd\u05bf-\u05c2\u05c4\u05c5\u05c7' # all nikud and teamim except makaf, sof-pasuk, nun-hafukha
     hebrew_diacritics_regex = re.compile(cc(hebrew_diacritics))
 
     hebrew_letters = 'א-ת'
     nonfinal_letters = 'אבגדהוזחטיכלמנסעפצקרשת'
-    final_letters = to_final(nonfinal_letters) + 'פ'
+    final_letters = to_final.__func__(nonfinal_letters) + 'פ'
     nonfinal_letters_allowing_geresh = 'גזצ'
-    final_letters_allowing_geresh = to_final(nonfinal_letters_allowing_geresh) + 'צ'
+    final_letters_allowing_geresh = to_final.__func__(nonfinal_letters_allowing_geresh) + 'צ'
     geresh = '\''
     nonfinal_letter_geresh_pattern = ncg(cc(nonfinal_letters_allowing_geresh) + geresh + '|' + cc(nonfinal_letters))
     final_letter_geresh_pattern = ncg(cc(final_letters_allowing_geresh) + geresh + '|' + cc(final_letters))
     non_hebrew_letters_regex = re.compile(ncc(hebrew_letters) + '+')
-    bad_final_regex = re.compile(cc('ךםןףץ')+cc(nonfinal_letters))
+    bad_final_regex = re.compile(cc(final_chars)+cc(nonfinal_letters))
 
     sentence_sep = '.?!'
     clause_sep_before_space = sentence_sep + ':;,)"'
@@ -202,7 +209,13 @@ class HebTokenizer:
 
     get_mwe_bigrams = partialmethod(get_mwe_ngrams, n=2)
 
+
+to_nonfinal = HebTokenizer.to_nonfinal
+to_final = HebTokenizer.to_final
+remove_diacritics = HebTokenizer.remove_diacritics
 sanitize = HebTokenizer.sanitize
+find_bad_final = HebTokenizer.find_bad_final
+
 
 if __name__ == '__main__':
 
@@ -212,12 +225,17 @@ if __name__ == '__main__':
         print(lst, len(lst))
 
     print_with_len(text)
+    print_with_len(to_final(text))
+    print_with_len(to_nonfinal(text))
+    print_with_len(remove_diacritics(text))
+    print(f'bad_final={find_bad_final(text)}')
     print_with_len(sanitize(text))
+    print_with_len(HebTokenizer.sanitize(text))
+
     heb_tokenizer = HebTokenizer()
     print_with_len(heb_tokenizer.sanitize(text))
     print_with_len(heb_tokenizer.get_words(text))
     print(f'has_word={heb_tokenizer.has_word(text)}')
-    print(f'bad_final={heb_tokenizer.find_bad_final(text)}')
     print_with_len(heb_tokenizer.get_mwe(text))
     print_with_len(heb_tokenizer.get_mwe_words(text))
     print_with_len(heb_tokenizer.get_mwe_words(text, flat=True))
