@@ -28,10 +28,13 @@ class HebTokenizer:
     Nikud and Teamim are ignored.
     Punctuation is normalized to ASCII (using unidecode).
     Correct usage of final letters (ךםןףץ) is enforced. Final פ and 'צ (with geresh) are allowed.
-    Same letter repetition (שולטתתתת), which is a common form of slang writing, is limited to a maximum of max_letter_repetition (default=2),
-        and at the end of words a maximum max_end_of_word_letter_repetition (default=2). Use 0 or None for no limit.
-        Note that these will throw away a very small number of legitimate repetitions, most notably 'מממ' as in 'מממן', 'מממשלת'.
-        allow_mmm (default=True) will specifically allow 'מממ' for the case max_letter_repetition==2.
+    Minimal word length is 2 proper letters.
+    Same character repetition (שולטתתתת), which is a common form of slang writing, is limited to a maximum of max_char_repetition (default=2),
+        and for the end of words or complete words, a same or more restrictive, maximum max_end_of_word_char_repetition (default=2). Use 0 or None for no limit.
+        Note that these will throw away a small number of words with legitimate repetitions, most notably 'מממ' as in 'מממן' ,'מממלכה' ,'מממשלה'.
+        allow_mmm (default=True) will specifically allow 'מממ' for the case max_char_repetition==2.
+        Other less common legitimate repetitions include: 'תתת', 'ששש', 'נננ', 'ממממ' ,'כככ', 'ייי', 'וווו', 'ווו', 'ההה', 'בבב'.
+    Words having only one or two distinct characters (חיחיחיחיחי), also a common form of slang writing, are limited to lengths up to max_one_two_char_word_len (default=7).
     Acronyms (צה"ל) and abbreviations ('וכו) are excluded, as well as numerals (42). (TBD)
     MWE refers to multi-word expression *candidates*, which are tokenized based on hyphen/makaf or surrounding punctuation.
     Hyphen-based MWE's are discarded if they contain more than max_mwe_hyphens (default=1). Use 0 not allowing hyphens or None for unlimited hyphens.
@@ -48,7 +51,7 @@ class HebTokenizer:
     def to_final(text):
         return text.translate(to_final_table)
 
-    hebrew_diacritics = '\u0591-\u05bd\u05bf-\u05c2\u05c4\u05c5\u05c7' # all nikud and teamim except makaf, sof-pasuk, nun-hafukha
+    hebrew_diacritics = '\u0591-\u05bd\u05bf-\u05c2\u05c4\u05c5\u05c7'  # all nikud and teamim except makaf, sof-pasuk, nun-hafukha
     hebrew_diacritics_regex = re.compile(cc(hebrew_diacritics))
 
     hebrew_letters = 'א-ת'
@@ -60,13 +63,13 @@ class HebTokenizer:
     nonfinal_letter_geresh_pattern = ncg(cc(nonfinal_letters_allowing_geresh) + geresh + '|' + cc(nonfinal_letters))
     final_letter_geresh_pattern = ncg(cc(final_letters_allowing_geresh) + geresh + '|' + cc(final_letters))
     non_hebrew_letters_regex = re.compile(ncc(hebrew_letters) + '+')
-    bad_final_regex = re.compile(cc(final_chars)+cc(nonfinal_letters))
+    bad_final_regex = re.compile(cc(final_chars) + cc(nonfinal_letters))
 
     sentence_sep = '.?!'
     clause_sep_before_space = sentence_sep + ':;,)"'
     clause_sep_after_space = '("'
     clause_sep_between_spaces = '-'
-    clause_sep_pattern = '\t|' + cc(clause_sep_before_space) + '\s|\s' + cc(clause_sep_after_space) + '|\s' + cc(clause_sep_between_spaces) + '\s'
+    clause_sep_pattern = '\t|' + cc(clause_sep_before_space) + '\\s|\\s' + cc(clause_sep_after_space) + '|\\s' + cc(clause_sep_between_spaces) + '\\s'
     clause_sep_regex = re.compile(clause_sep_pattern)
     sentence_sep_regex = re.compile(cc(sentence_sep))
 
@@ -74,48 +77,57 @@ class HebTokenizer:
     mwe_words_sep_regex = re.compile(cc(mwe_words_sep))
 
     mmm_pattern = '(?<!(?<!m)mmm)'.replace('m', 'מ')
-    line_opening_hyphen_pattern = '((?:^|\n|\r)\s*-{1,2})(?=\w)'
+    line_opening_hyphen_pattern = '((?:^|\n|\r)\\s*-{1,2})(?=\\w)'
     line_opening_hyphen_regex = re.compile(line_opening_hyphen_pattern, flags=re.MULTILINE)
 
     CLAUSE = 1
     SENTENCE = 2
     LINE = 3
 
-    default_max_letter_repetition = 2
-    default_max_end_of_word_letter_repetition = 2
+    default_max_char_repetition = 2
+    default_max_end_of_word_char_repetition = 2
     default_allow_mmm = True
+    default_max_one_two_char_word_len = 7  # based on Hspell. e.g. שישישיי
     default_max_mwe_hyphens = 1
     default_allow_line_opening_hyphens = True
     default_strict = None
-    default_bad_final_exceptions = ['לםרבה', 'יוםיום', 'סוףסוף']
+    default_bad_final_exceptions = ('לםרבה', 'יוםיום', 'סוףסוף')  # note: these exceptions are only for finding bad finals. the tokenizer will still ignore them
 
 
-    def __init__(self, max_letter_repetition=default_max_letter_repetition, max_end_of_word_letter_repetition=default_max_end_of_word_letter_repetition, allow_mmm=default_allow_mmm, max_mwe_hyphens=default_max_mwe_hyphens, allow_line_opening_hyphens=default_allow_line_opening_hyphens):
-        self.max_letter_repetition = max_letter_repetition
-        self.max_end_of_word_letter_repetition = max_end_of_word_letter_repetition
+    def __init__(self, max_char_repetition=default_max_char_repetition, max_end_of_word_char_repetition=default_max_end_of_word_char_repetition, allow_mmm=default_allow_mmm, max_one_two_char_word_len=default_max_one_two_char_word_len, max_mwe_hyphens=default_max_mwe_hyphens, allow_line_opening_hyphens=default_allow_line_opening_hyphens):
+        self.max_char_repetition = max_char_repetition
+        self.max_end_of_word_char_repetition = max_end_of_word_char_repetition
         self.allow_mmm = allow_mmm
+        self.max_one_two_char_word_len = max_one_two_char_word_len
         self.max_mwe_hyphens = max_mwe_hyphens
         self.allow_line_opening_hyphens = allow_line_opening_hyphens
 
         mmm = ''
         neg_rep = ''
         neg_end_rep = ''
-        if max_letter_repetition == 2 and allow_mmm:
+        short_or_diverse = ''
+        cch = cc(self.hebrew_letters)
+        ncch = ncc(self.hebrew_letters)
+        if max_char_repetition == 2 and allow_mmm:
             mmm = self.mmm_pattern
-        if max_letter_repetition:
-            neg_rep = nla('\\1{' + str(max_letter_repetition) + '}' + mmm)
-        if max_end_of_word_letter_repetition:
-            neg_end_rep = nla('\\1{' + str(max_end_of_word_letter_repetition) + ',}' + ncg('$|' + ncc(self.hebrew_letters)))
-        self.word_pattern = '(?<!' + cc(self.hebrew_letters) + '[^\s-])\\b' + ncg('(' + self.nonfinal_letter_geresh_pattern + ')' + neg_rep + neg_end_rep) + '+' + self.final_letter_geresh_pattern + '(?!\w)'+nla('[^\s-]' + cc(self.hebrew_letters)) + nla('-' + ncg('$|' + ncc(self.hebrew_letters)))
+        if max_char_repetition:
+            neg_rep = nla('\\1{' + str(max_char_repetition) + '}' + mmm)
+        if max_end_of_word_char_repetition:
+            if max_char_repetition:
+                assert max_end_of_word_char_repetition <= max_char_repetition, f'max_end_of_word_char_repetition={max_end_of_word_char_repetition} cannot be greater than max_char_repetition={max_char_repetition}'
+            neg_end_rep = nla('\\1{' + str(max_end_of_word_char_repetition) + '}' + ncg('$|' + ncch))
+        if max_one_two_char_word_len:
+            short_or_diverse = '(?=' + cch + '{1,'+ str(max_one_two_char_word_len) +'}\\b|' + cch + '*(?P<char1>' + cch + ')(?!(?P=char1))(?P<char2>' + cch + ')' + cch + '*(?!(?P=char1))(?!(?P=char2))' + cch + '+)'
+        self.word_pattern = '(?<!' + cch + '[^\\s-])\\b' + short_or_diverse + ncg('(' + self.nonfinal_letter_geresh_pattern + ')' + neg_rep + neg_end_rep) + '+' + self.final_letter_geresh_pattern + '(?!\\w)' + nla('[^\\s-]' + cch) + nla('-' + ncg('$|' + ncch))
 
         max_mwe_hyphens_pattern = ''
         if max_mwe_hyphens != 0:
             max_mwe_hyphens_str = ''
             if max_mwe_hyphens is not None:
                 max_mwe_hyphens_str = str(max_mwe_hyphens)
-            max_mwe_hyphens_pattern = '|' + ncg('-' + self.word_pattern.replace('\\1', '\\3')) + '{1,' + max_mwe_hyphens_str + '}'
-        self.mwe_pattern = '(?<!-)' + self.word_pattern + ncg(ncg(' ' + self.word_pattern.replace('\\1', '\\2')) + '+' + max_mwe_hyphens_pattern) + '(?!-)'
-        self.line_with_strict_mwe_pattern = '^' + ncc(self.hebrew_letters) + '*' + self.mwe_pattern + ncc(self.hebrew_letters) + '*$'
+            max_mwe_hyphens_pattern = '|' + ncg('-' + self.word_pattern.replace('\\1', '\\3').replace('char', '__char')) + '{1,' + max_mwe_hyphens_str + '}'
+        self.mwe_pattern = '(?<!-)' + self.word_pattern + ncg(ncg(' ' + self.word_pattern.replace('\\1', '\\2').replace('char', '_char')) + '+' + max_mwe_hyphens_pattern) + '(?!-)'
+        self.line_with_strict_mwe_pattern = '^' + ncch + '*' + self.mwe_pattern + ncch + '*$'
 
         self.word_regex = re.compile(self.word_pattern)
         self.mwe_regex = re.compile(self.mwe_pattern)
@@ -129,11 +141,11 @@ class HebTokenizer:
     def sanitize(text, remove_diacritics=True):
         if remove_diacritics:
             text = HebTokenizer.remove_diacritics(text)
-        text = text.replace('\u05C3','. ') # deal with sof-pasuk for biblical texts
+        text = text.replace('\u05C3','. ')  # deal with sof-pasuk for biblical texts
         return HebTokenizer.non_hebrew_letters_regex.sub(lambda x: unidecode_expect_nonascii(x.group(), errors='preserve'), text)
 
     @staticmethod
-    def find_bad_final(text, remove_diacritics=True, bad_final_exceptions=default_bad_final_exceptions, ret_all=False): # this could help detect text containing badly fused words or lines
+    def find_bad_final(text, remove_diacritics=True, bad_final_exceptions=default_bad_final_exceptions, ret_all=False):  # this could help detect text containing badly fused words or lines
         if remove_diacritics:
             text = HebTokenizer.remove_diacritics(text)
         for x in bad_final_exceptions or []:
