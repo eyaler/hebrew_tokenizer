@@ -35,9 +35,9 @@ class HebTokenizer:
     Minimal word length is 2 proper letters.
     Same character repetition (שולטתתתת), which is a common form of slang writing, is limited to a maximum of max_char_repetition (default=2),
         and for the end of words or complete words, a same or more restrictive, maximum max_end_of_word_char_repetition (default=2). Use 0 or None for no limit.
-        Note that these will throw away a small number of words with legitimate repetitions, most notably 'מממ' as in 'מממן' ,'מממלכה' ,'מממשלה'.
+        Note that these will throw away a small number of words with legitimate repetitions, most notably 'מממ' as in 'מממשלת' ,'מממש' ,'מממן'.
         allow_mmm (default=True) will specifically allow 'מממ' for the case max_char_repetition==2.
-        Other less common legitimate repetitions include: 'תתת', 'ששש', 'נננ', 'ממממ' ,'כככ', 'ייי', 'וווו', 'ווו', 'ההה', 'בבב'.
+        Other less common legitimate repetitions include: 'תתת' ,'ששש' ,'נננ' ,'ממממ' ,'כככ' ,'ייי' ,'וווו' ,'ווו' ,'ההה' ,'בבב'.
     Words having only one or two distinct characters (חיחיחיחיחי), also a common form of slang writing, are limited to lengths up to max_one_two_char_word_len (default=7).
     Acronyms (צה"ל) and abbreviations ('וכו) are excluded, as well as numerals (42). (TBD)
     MWE refers to multi-word expression *candidates*, which are tokenized based on hyphen/makaf or surrounding punctuation.
@@ -114,22 +114,31 @@ class HebTokenizer:
         if max_char_repetition == 2 and allow_mmm:
             mmm = self.mmm_pattern
         if max_char_repetition:
-            neg_rep = nla('\\1{' + str(max_char_repetition) + '}' + mmm)
+            neg_rep = nla('(?P=ref_char0){' + str(max_char_repetition) + '}' + mmm)
         if max_end_of_word_char_repetition:
             if max_char_repetition:
                 assert max_end_of_word_char_repetition <= max_char_repetition, f'max_end_of_word_char_repetition={max_end_of_word_char_repetition} cannot be greater than max_char_repetition={max_char_repetition}'
-            neg_end_rep = nla('\\1{' + str(max_end_of_word_char_repetition) + '}' + ncg('$|' + ncch))
+            neg_end_rep = nla('(?P=ref_char0){' + str(max_end_of_word_char_repetition) + '}' + ncg('$|' + ncch))
         if max_one_two_char_word_len:
-            short_or_diverse = '(?=' + cch + '{1,' + str(max_one_two_char_word_len) + '}\\b|' + cch + '*(?P<char1>' + cch + ')(?!(?P=char1))(?P<char2>' + cch + ')' + cch + '*(?!(?P=char1))(?!(?P=char2))' + cch + '+)'
-        self.word_pattern = '(?<!' + cch + '[^\\s-])\\b' + short_or_diverse + ncg('(' + self.nonfinal_letter_geresh_pattern + ')' + neg_rep + neg_end_rep) + '+' + self.final_letter_geresh_pattern + '(?!\\w)' + nla('[^\\s-]' + cch) + nla('-' + ncg('$|' + ncch))
+            short_or_diverse = '(?=' + cch + '{1,' + str(max_one_two_char_word_len) + '}\\b|' + cch + '*(?P<ref_char1>' + cch + ')(?!(?P=ref_char1))(?P<ref_char>' + cch + ')' + cch + '*(?!(?P=ref_char1))(?!(?P=ref_char))' + cch + '+)'
+        self.word_pattern = '(?<!' + cch + '[^\\s-])\\b' + short_or_diverse + ncg('(?P<ref_char0>' + self.nonfinal_letter_geresh_pattern + ')' + neg_rep + neg_end_rep) + '+' + self.final_letter_geresh_pattern + '(?!\\w)' + nla('[^\\s-]' + cch) + nla('-' + ncg('$|' + ncch))
+
+        reuse_cnt = {}
+
+        def reuse_regex_pattern(pattern):
+            if pattern not in reuse_cnt:
+                reuse_cnt[pattern] = 0
+            else:
+                reuse_cnt[pattern] += 1
+            return re.sub('(\\(?P[<=])', '\\1' + '_' * reuse_cnt[pattern], pattern)
 
         max_mwe_hyphens_pattern = ''
         if max_mwe_hyphens != 0:
             max_mwe_hyphens_str = ''
             if max_mwe_hyphens is not None:
                 max_mwe_hyphens_str = str(max_mwe_hyphens)
-            max_mwe_hyphens_pattern = '|' + ncg('-' + self.word_pattern.replace('\\1', '\\3').replace('char', '__char')) + '{1,' + max_mwe_hyphens_str + '}'
-        self.mwe_pattern = '(?<!-)' + self.word_pattern + ncg(ncg(' ' + self.word_pattern.replace('\\1', '\\2').replace('char', '_char')) + '+' + max_mwe_hyphens_pattern) + '(?!-)'
+            max_mwe_hyphens_pattern = '|' + ncg('-' + reuse_regex_pattern(self.word_pattern)) + '{1,' + max_mwe_hyphens_str + '}'
+        self.mwe_pattern = '(?<!-)' + reuse_regex_pattern(self.word_pattern) + ncg(ncg(' ' + reuse_regex_pattern(self.word_pattern)) + '+' + max_mwe_hyphens_pattern) + '(?!-)'
         self.line_with_strict_mwe_pattern = '^' + ncch + '*' + self.mwe_pattern + ncch + '*$'
 
         self.word_regex = re.compile(self.word_pattern)
