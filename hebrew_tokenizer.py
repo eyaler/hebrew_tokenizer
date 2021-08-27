@@ -8,14 +8,18 @@ from unidecode import unidecode_expect_nonascii
 def cc(s):
     return '[' + s + ']'
 
+
 def ncc(s):
     return cc('^' + s)
+
 
 def ncg(s):
     return '(?:' + s + ')'
 
+
 def nla(s):
     return '(?!' + s + ')'
+
 
 final_chars = 'ךםןףץ'
 nonfinal_chars = 'כמנפצ'
@@ -24,7 +28,7 @@ to_final_table = str.maketrans(nonfinal_chars, final_chars)
 
 
 class HebTokenizer:
-    '''
+    """
     Nikud and Teamim are ignored.
     Punctuation is normalized to ASCII (using unidecode).
     Correct usage of final letters (ךםןףץ) is enforced. Final פ and 'צ (with geresh) are allowed.
@@ -41,7 +45,7 @@ class HebTokenizer:
     Line opening hyphens as used in conversation and enumeration, can be ignored by allow_line_opening_hyphens (default=True)
     Strict mode can enforce the absence of extraneous hebrew letters in the same "clause" (strict=HebTokenizer.CLAUSE),
         sentence (strict=HebTokenizer.SENTENCE) or line (strict=HebTokenizer.LINE) of the MWE. Use 0 or None to not be strict (default=None).
-    '''
+    """
 
     @staticmethod
     def to_nonfinal(text):
@@ -93,7 +97,6 @@ class HebTokenizer:
     default_strict = None
     default_bad_final_exceptions = ('לםרבה', 'יוםיום', 'סוףסוף')  # note: these exceptions are only for finding bad finals. the tokenizer will still ignore them
 
-
     def __init__(self, max_char_repetition=default_max_char_repetition, max_end_of_word_char_repetition=default_max_end_of_word_char_repetition, allow_mmm=default_allow_mmm, max_one_two_char_word_len=default_max_one_two_char_word_len, max_mwe_hyphens=default_max_mwe_hyphens, allow_line_opening_hyphens=default_allow_line_opening_hyphens):
         self.max_char_repetition = max_char_repetition
         self.max_end_of_word_char_repetition = max_end_of_word_char_repetition
@@ -117,7 +120,7 @@ class HebTokenizer:
                 assert max_end_of_word_char_repetition <= max_char_repetition, f'max_end_of_word_char_repetition={max_end_of_word_char_repetition} cannot be greater than max_char_repetition={max_char_repetition}'
             neg_end_rep = nla('\\1{' + str(max_end_of_word_char_repetition) + '}' + ncg('$|' + ncch))
         if max_one_two_char_word_len:
-            short_or_diverse = '(?=' + cch + '{1,'+ str(max_one_two_char_word_len) +'}\\b|' + cch + '*(?P<char1>' + cch + ')(?!(?P=char1))(?P<char2>' + cch + ')' + cch + '*(?!(?P=char1))(?!(?P=char2))' + cch + '+)'
+            short_or_diverse = '(?=' + cch + '{1,' + str(max_one_two_char_word_len) + '}\\b|' + cch + '*(?P<char1>' + cch + ')(?!(?P=char1))(?P<char2>' + cch + ')' + cch + '*(?!(?P=char1))(?!(?P=char2))' + cch + '+)'
         self.word_pattern = '(?<!' + cch + '[^\\s-])\\b' + short_or_diverse + ncg('(' + self.nonfinal_letter_geresh_pattern + ')' + neg_rep + neg_end_rep) + '+' + self.final_letter_geresh_pattern + '(?!\\w)' + nla('[^\\s-]' + cch) + nla('-' + ncg('$|' + ncch))
 
         max_mwe_hyphens_pattern = ''
@@ -141,7 +144,7 @@ class HebTokenizer:
     def sanitize(text, remove_diacritics=True):
         if remove_diacritics:
             text = HebTokenizer.remove_diacritics(text)
-        text = text.replace('\u05C3','. ')  # deal with sof-pasuk for biblical texts
+        text = text.replace('\u05C3', '. ')  # deal with sof-pasuk for biblical texts
         return HebTokenizer.non_hebrew_letters_regex.sub(lambda x: unidecode_expect_nonascii(x.group(), errors='preserve'), text)
 
     @staticmethod
@@ -195,7 +198,7 @@ class HebTokenizer:
             else:
                 assert strict == self.LINE, f'Unknown strict mode: {strict}'
             result = (self.mwe_regex.search(match.group()).group() for match in
-                    self.line_with_strict_mwe_regex.finditer(text))
+                      self.line_with_strict_mwe_regex.finditer(text))
         else:
             result = (match.group() for match in self.mwe_regex.finditer(text))
         if not iter:
@@ -212,7 +215,7 @@ class HebTokenizer:
 
     def get_mwe_ngrams(self, text, n, sanitize=True, strict=default_strict, as_strings=False, flat=False, iter=False):
         words = self.get_mwe_words(text, sanitize=sanitize, strict=strict, flat=False, iter=iter)
-        result = ([' '.join(word_list[i:i+n]) if as_strings else tuple(word_list[i:i+n]) for i in range(len(word_list)-n+1)] for word_list in words if len(word_list)>=n)
+        result = ([' '.join(word_list[i:i+n]) if as_strings else tuple(word_list[i:i+n]) for i in range(len(word_list)-n+1)] for word_list in words if len(word_list) >= n)
         if flat:
             result = (ngram for ngram_list in result for ngram in ngram_list)
         if not iter:
