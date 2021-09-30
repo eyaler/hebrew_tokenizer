@@ -96,7 +96,7 @@ class HebTokenizer:
     default_max_mwe_hyphens = 1
     default_allow_line_opening_hyphens = True
     default_strict = None
-    default_bad_final_exceptions = ('לםרבה', 'יוםיום', 'סוףסוף')  # note: these exceptions are only for finding bad finals. the tokenizer will still ignore them
+    default_bad_final_exceptions = 'לםרבה', 'יוםיום', 'סוףסוף'  # note: these exceptions are only for finding bad finals. the tokenizer will still ignore them
 
     def __init__(self, max_char_repetition=default_max_char_repetition, max_end_of_word_char_repetition=default_max_end_of_word_char_repetition, allow_mmm=default_allow_mmm, max_one_two_char_word_len=default_max_one_two_char_word_len, max_mwe_hyphens=default_max_mwe_hyphens, allow_line_opening_hyphens=default_allow_line_opening_hyphens):
         self.max_char_repetition = max_char_repetition
