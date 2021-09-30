@@ -1,7 +1,8 @@
 # A battle-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs, oscar, cc100, mc4) focused on multi-word expression extraction.
 
-import re
 from functools import partialmethod
+import re
+
 from unidecode import unidecode_expect_nonascii
 
 
@@ -171,16 +172,16 @@ class HebTokenizer:
             text = self.sanitize(text)
         return bool(self.word_regex.fullmatch(text))
 
-    def get_words(self, text, sanitize=True, iter=False):
+    def get_words(self, text, sanitize=True, iterator=False):
         if sanitize:
             text = self.sanitize(text)
         result = (match.group() for match in self.word_regex.finditer(text))
-        if not iter:
+        if not iterator:
             result = list(result)
         return result
 
     def has_word(self, text, sanitize=True):
-        for _ in self.get_words(text, sanitize=sanitize, iter=True):
+        for _ in self.get_words(text, sanitize=sanitize, iterator=True):
             return True
         return False
 
@@ -194,7 +195,7 @@ class HebTokenizer:
             text = self.sanitize(text)
         return self.is_word(text, sanitize=False) or self.is_mwe(text, sanitize=False)
 
-    def get_mwe(self, text, sanitize=True, strict=default_strict, iter=False):
+    def get_mwe(self, text, sanitize=True, strict=default_strict, iterator=False):
         if sanitize:
             text = self.sanitize(text)
         if self.allow_line_opening_hyphens:
@@ -210,24 +211,24 @@ class HebTokenizer:
                       self.line_with_strict_mwe_regex.finditer(text))
         else:
             result = (match.group() for match in self.mwe_regex.finditer(text))
-        if not iter:
+        if not iterator:
             result = list(result)
         return result
 
-    def get_mwe_words(self, text, sanitize=True, strict=default_strict, flat=False, iter=False):
+    def get_mwe_words(self, text, sanitize=True, strict=default_strict, flat=False, iterator=False):
         result = (self.mwe_words_sep_regex.split(mwe) for mwe in self.get_mwe(text, sanitize=sanitize, strict=strict))
         if flat:
             result = (word for word_list in result for word in word_list)
-        if not iter:
+        if not iterator:
             result = list(result)
         return result
 
-    def get_mwe_ngrams(self, text, n, sanitize=True, strict=default_strict, as_strings=False, flat=False, iter=False):
-        words = self.get_mwe_words(text, sanitize=sanitize, strict=strict, flat=False, iter=iter)
+    def get_mwe_ngrams(self, text, n, sanitize=True, strict=default_strict, as_strings=False, flat=False, iterator=False):
+        words = self.get_mwe_words(text, sanitize=sanitize, strict=strict, flat=False, iterator=iterator)
         result = ([' '.join(word_list[i:i+n]) if as_strings else tuple(word_list[i:i+n]) for i in range(len(word_list)-n+1)] for word_list in words if len(word_list) >= n)
         if flat:
             result = (ngram for ngram_list in result for ngram in ngram_list)
-        if not iter:
+        if not iterator:
             result = list(result)
         return result
 
