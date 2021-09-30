@@ -131,7 +131,7 @@ class HebTokenizer:
                 reuse_cnt[pattern] = 0
             else:
                 reuse_cnt[pattern] += 1
-            return re.sub('(\\(?P[<=])', '\\1' + '_' * reuse_cnt[pattern], pattern)
+            return re.sub('(\\(?P[<=])', '\\1' + '_'*reuse_cnt[pattern], pattern)
 
         max_mwe_hyphens_pattern = ''
         if max_mwe_hyphens != 0:
@@ -225,7 +225,7 @@ class HebTokenizer:
 
     def get_mwe_ngrams(self, text, n, sanitize=True, strict=default_strict, as_strings=False, flat=False, iterator=False):
         words = self.get_mwe_words(text, sanitize=sanitize, strict=strict, flat=False, iterator=iterator)
-        result = ([' '.join(word_list[i:i+n]) if as_strings else tuple(word_list[i:i+n]) for i in range(len(word_list)-n+1)] for word_list in words if len(word_list) >= n)
+        result = ([' '.join(word_list[i : i + n]) if as_strings else tuple(word_list[i : i + n]) for i in range(len(word_list) - n + 1)] for word_list in words if len(word_list) >= n)
         if flat:
             result = (ngram for ngram_list in result for ngram in ngram_list)
         if not iterator:
