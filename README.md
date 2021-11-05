@@ -1,5 +1,5 @@
 # hebrew_tokenizer
-A battle-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs, oscar, cc100, mc4) focused on multi-word expression extraction.
+A field-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs, oscar, cc100, mc4) focused on multi-word expression extraction.
 
 * Nikud and Teamim are ignored.
 * Punctuation is normalized to ASCII (using unidecode).

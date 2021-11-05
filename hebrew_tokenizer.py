@@ -1,4 +1,4 @@
-# A battle-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs, oscar, cc100, mc4) focused on multi-word expression extraction.
+# A field-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs, oscar, cc100, mc4) focused on multi-word expression extraction.
 
 from functools import partialmethod
 import re
@@ -69,6 +69,7 @@ class HebTokenizer:
     final_letter_geresh_pattern = ncg(cc(final_letters_allowing_geresh) + geresh + '|' + cc(final_letters))
     non_hebrew_letters_regex = re.compile(ncc(hebrew_letters) + '+')
     bad_final_regex = re.compile(cc(final_chars) + cc(nonfinal_letters))
+    hashtag_regex = re.compile('#[\\w\'"\u05be\u05f3\u05f4-]+')  # for performance we will not do unidecode sanitizaion so we accomodate makaf, geresh, gershaim explicitly
 
     sentence_sep = '.?!'
     clause_sep_before_space = sentence_sep + ':;,)"'
@@ -96,7 +97,7 @@ class HebTokenizer:
     default_max_mwe_hyphens = 1
     default_allow_line_opening_hyphens = True
     default_strict = None
-    default_bad_final_exceptions = 'לםרבה', 'יוםיום', 'סוףסוף'  # note: these exceptions are only for finding bad finals. the tokenizer will still ignore them
+    default_bad_final_exceptions = 'לםרבה', 'אנשיםות', 'יוםיום', 'סוףסוף'  # note: these exceptions are only for finding bad finals. the tokenizer will still ignore them
 
     def __init__(self, max_char_repetition=default_max_char_repetition, max_end_of_word_char_repetition=default_max_end_of_word_char_repetition, allow_mmm=default_allow_mmm, max_one_two_char_word_len=default_max_one_two_char_word_len, max_mwe_hyphens=default_max_mwe_hyphens, allow_line_opening_hyphens=default_allow_line_opening_hyphens):
         self.max_char_repetition = max_char_repetition
@@ -158,10 +159,12 @@ class HebTokenizer:
         return cls.non_hebrew_letters_regex.sub(lambda x: unidecode_expect_nonascii(x.group(), errors='preserve'), text)
 
     @classmethod
-    def find_bad_final(cls, text, remove_diacritics=True, bad_final_exceptions=default_bad_final_exceptions, ret_all=False):  # this could help detect text containing badly fused words or lines
+    def find_bad_final(cls, text, remove_diacritics=True, exceptions=default_bad_final_exceptions, allow_hashtag=True, ret_all=False):  # this could help detect text containing badly fused words or lines
         if remove_diacritics:
             text = cls.remove_diacritics(text)
-        for x in bad_final_exceptions or []:
+        if allow_hashtag:
+            text = cls.hashtag_regex.sub('', text)
+        for x in exceptions or []:
             text = text.replace(x, '')
         if ret_all:
             return cls.bad_final_regex.findall(text)
