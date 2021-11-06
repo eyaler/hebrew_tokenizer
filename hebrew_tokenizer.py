@@ -1,4 +1,5 @@
-# A field-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs, oscar, cc100, mc4) focused on multi-word expression extraction.
+"""A field-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs, oscar, cc100, mc4) focused on multi-word expression extraction."""
+
 
 from functools import partialmethod
 import re
@@ -29,7 +30,8 @@ to_final_table = str.maketrans(nonfinal_chars, final_chars)
 
 
 class HebTokenizer:
-    """
+    """A field-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs, oscar, cc100, mc4) focused on multi-word expression extraction.
+
     Nikud and Teamim are ignored.
     Punctuation is normalized to ASCII (using unidecode).
     Correct usage of final letters (ךםןףץ) is enforced. Final פ and 'צ (with geresh) are allowed.
@@ -256,14 +258,14 @@ if __name__ == '__main__':
     print_with_len(to_final(text))
     print_with_len(to_nonfinal(text))
     print_with_len(remove_diacritics(text))
-    print(f'bad_final={find_bad_final(text)}')
+    print('bad_final=', find_bad_final(text))
     print_with_len(sanitize(text))
     print_with_len(HebTokenizer.sanitize(text))
 
     heb_tokenizer = HebTokenizer()
     print_with_len(heb_tokenizer.sanitize(text))
     print_with_len(heb_tokenizer.get_words(text))
-    print(f'has_word={heb_tokenizer.has_word(text)}')
+    print('has_word=', heb_tokenizer.has_word(text))
     print_with_len(heb_tokenizer.get_mwe(text))
     print_with_len(heb_tokenizer.get_mwe_words(text))
     print_with_len(heb_tokenizer.get_mwe_words(text, flat=True))
