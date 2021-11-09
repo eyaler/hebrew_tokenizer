@@ -13,7 +13,7 @@ A field-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs, oscar
 * Words having only one or two distinct characters (חיחיחיחיחי), also a common form of slang writing, are limited to lengths up to max_one_two_char_word_len (default=7).
 * Acronyms (צה"ל) and abbreviations ('וכו) are excluded, as well as numerals (42). (TBD)
 * MWE refers to multi-word expression *candidates*, which are tokenized based on hyphen/makaf or surrounding punctuation.
-* Hyphen-based MWE's are discarded if they contain more than max_mwe_hyphens (default=1). Use 0 not allowing hyphens or None for unlimited hyphens.
+* Hyphen-based MWE's are discarded if they contain more than max_mwe_hyphens (default=1). Use 0 not allowing hyphens (e.g. for biblical texts) or None for unlimited hyphens.
 * Line opening hyphens as used in conversation and enumeration, can be ignored by allow_line_opening_hyphens (default=True)
 * Strict mode can enforce the absence of extraneous hebrew letters in the same "clause" (strict=HebTokenizer.CLAUSE),
     sentence (strict=HebTokenizer.SENTENCE) or line (strict=HebTokenizer.LINE) of the MWE. Use 0 or None to not be strict (default=None).

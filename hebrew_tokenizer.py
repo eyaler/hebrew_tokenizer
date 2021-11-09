@@ -44,7 +44,7 @@ class HebTokenizer:
     Words having only one or two distinct characters (חיחיחיחיחי), also a common form of slang writing, are limited to lengths up to max_one_two_char_word_len (default=7).
     Acronyms (צה"ל) and abbreviations ('וכו) are excluded, as well as numerals (42). (TBD)
     MWE refers to multi-word expression *candidates*, which are tokenized based on hyphen/makaf or surrounding punctuation.
-    Hyphen-based MWE's are discarded if they contain more than max_mwe_hyphens (default=1). Use 0 not allowing hyphens or None for unlimited hyphens.
+    Hyphen-based MWE's are discarded if they contain more than max_mwe_hyphens (default=1). Use 0 not allowing hyphens (e.g. for biblical texts) or None for unlimited hyphens.
     Line opening hyphens as used in conversation and enumeration, can be ignored by allow_line_opening_hyphens (default=True)
     Strict mode can enforce the absence of extraneous hebrew letters in the same "clause" (strict=HebTokenizer.CLAUSE),
         sentence (strict=HebTokenizer.SENTENCE) or line (strict=HebTokenizer.LINE) of the MWE. Use 0 or None to not be strict (default=None).
@@ -121,7 +121,7 @@ class HebTokenizer:
             neg_rep = nla('(?P=ref_char0){' + str(max_char_repetition) + '}' + mmm)
         if max_end_of_word_char_repetition:
             if max_char_repetition:
-                assert max_end_of_word_char_repetition <= max_char_repetition, f'max_end_of_word_char_repetition={max_end_of_word_char_repetition} cannot be greater than max_char_repetition={max_char_repetition}'
+                assert max_end_of_word_char_repetition <= max_char_repetition, 'max_end_of_word_char_repetition=%d cannot be greater than max_char_repetition=%d' % (max_end_of_word_char_repetition, max_char_repetition)
             neg_end_rep = nla('(?P=ref_char0){' + str(max_end_of_word_char_repetition) + '}' + ncg('$|' + ncch))
         if max_one_two_char_word_len:
             short_or_diverse = '(?=' + cch + '{1,' + str(max_one_two_char_word_len) + '}\\b|' + cch + '*(?P<ref_char1>' + cch + ')(?!(?P=ref_char1))(?P<ref_char>' + cch + ')' + cch + '*(?!(?P=ref_char1))(?!(?P=ref_char))' + cch + '+)'
@@ -154,10 +154,11 @@ class HebTokenizer:
         return cls.hebrew_diacritics_regex.sub('', text)
 
     @classmethod
-    def sanitize(cls, text, remove_diacritics=True):
+    def sanitize(cls, text, remove_diacritics=True, bible=False):
         if remove_diacritics:
             text = cls.remove_diacritics(text)
-        text = text.replace('\u05C3', '. ')  # deal with sof-pasuk for biblical texts
+        if bible:
+            text = text.replace('\u05be', ' ').replace('\u05c3', '. ')  # for biblical texts makaf is a taam and does not signify hyphenation, and sof-pasuk separates sentences.
         return cls.non_hebrew_letters_regex.sub(lambda x: unidecode_expect_nonascii(x.group(), errors='preserve'), text)
 
     @classmethod
@@ -211,7 +212,7 @@ class HebTokenizer:
             elif strict == self.SENTENCE:
                 text = '\n'.join(self.sentence_sep_regex.split(text))
             else:
-                assert strict == self.LINE, f'Unknown strict mode: {strict}'
+                assert strict == self.LINE, 'Unknown strict mode: %s' % strict
             result = (self.mwe_regex.search(match.group()).group() for match in
                       self.line_with_strict_mwe_regex.finditer(text))
         else:
