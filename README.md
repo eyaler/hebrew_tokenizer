@@ -1,5 +1,5 @@
 # hebrew_tokenizer
-A field-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs, oscar, cc100, mc4) focused on multi-word expression extraction.
+A field-tested Hebrew tokenizer for dirty texts (ben-yehuda project, bible, cc100, mc4, opensubs, oscar, twitter) focused on multi-word expression extraction.
 
 * Nikud and Teamim are ignored.
 * Punctuation is normalized to ASCII (using unidecode).
@@ -17,3 +17,4 @@ A field-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs, oscar
 * Line opening hyphens as used in conversation and enumeration, can be ignored by allow_line_opening_hyphens (default=True)
 * Strict mode can enforce the absence of extraneous hebrew letters in the same "clause" (strict=HebTokenizer.CLAUSE),
     sentence (strict=HebTokenizer.SENTENCE) or line (strict=HebTokenizer.LINE) of the MWE. Use 0 or None to not be strict (default=None).
+* Optionally allow number references with allow_number_refs (default=False).

@@ -2,6 +2,7 @@
 
 
 from functools import partialmethod
+import hashlib
 import re
 
 from unidecode import unidecode_expect_nonascii
@@ -30,7 +31,7 @@ to_final_table = str.maketrans(nonfinal_chars, final_chars)
 
 
 class HebTokenizer:
-    """A field-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs, oscar, cc100, mc4) focused on multi-word expression extraction.
+    """A field-tested Hebrew tokenizer for dirty texts (ben-yehuda project, bible, cc100, mc4, opensubs, oscar, twitter) focused on multi-word expression extraction.
 
     Nikud and Teamim are ignored.
     Punctuation is normalized to ASCII (using unidecode).
@@ -48,6 +49,7 @@ class HebTokenizer:
     Line opening hyphens as used in conversation and enumeration, can be ignored by allow_line_opening_hyphens (default=True)
     Strict mode can enforce the absence of extraneous hebrew letters in the same "clause" (strict=HebTokenizer.CLAUSE),
         sentence (strict=HebTokenizer.SENTENCE) or line (strict=HebTokenizer.LINE) of the MWE. Use 0 or None to not be strict (default=None).
+    Optionally allow number references with allow_number_refs (default=False).
     """
 
     @staticmethod
@@ -65,7 +67,6 @@ class HebTokenizer:
     pasek_regex = re.compile(pasek_pattern)
     sofpasuk_pattern = horizontal_space + '*' + '\u05c3' + horizontal_space + '*'
     sofpasuk_regex = re.compile(sofpasuk_pattern)
-
 
     hebrew_letters = 'א-ת'
     nonfinal_letters = 'אבגדהוזחטיכלמנסעפצקרשת'
@@ -104,16 +105,18 @@ class HebTokenizer:
     default_max_one_two_char_word_len = 7  # based on Hspell. e.g. שישישיי
     default_max_mwe_hyphens = 1
     default_allow_line_opening_hyphens = True
+    default_allow_number_refs = False
     default_strict = None
     default_bad_final_exceptions = 'לםרבה', 'אנשיםות', 'יוםיום', 'סוףסוף'  # note: these exceptions are only for finding bad finals. the tokenizer will still ignore them
 
-    def __init__(self, max_char_repetition=default_max_char_repetition, max_end_of_word_char_repetition=default_max_end_of_word_char_repetition, allow_mmm=default_allow_mmm, max_one_two_char_word_len=default_max_one_two_char_word_len, max_mwe_hyphens=default_max_mwe_hyphens, allow_line_opening_hyphens=default_allow_line_opening_hyphens):
+    def __init__(self, max_char_repetition=default_max_char_repetition, max_end_of_word_char_repetition=default_max_end_of_word_char_repetition, allow_mmm=default_allow_mmm, max_one_two_char_word_len=default_max_one_two_char_word_len, max_mwe_hyphens=default_max_mwe_hyphens, allow_line_opening_hyphens=default_allow_line_opening_hyphens, allow_number_refs=default_allow_number_refs):
         self.max_char_repetition = max_char_repetition
         self.max_end_of_word_char_repetition = max_end_of_word_char_repetition
         self.allow_mmm = allow_mmm
         self.max_one_two_char_word_len = max_one_two_char_word_len
         self.max_mwe_hyphens = max_mwe_hyphens
         self.allow_line_opening_hyphens = allow_line_opening_hyphens
+        self.allow_number_refs = allow_number_refs
 
         mmm = ''
         neg_rep = ''
@@ -131,7 +134,12 @@ class HebTokenizer:
             neg_end_rep = nla('(?P=ref_char0){' + str(max_end_of_word_char_repetition) + '}' + ncg('$|' + ncch))
         if max_one_two_char_word_len:
             short_or_diverse = '(?=' + cch + '{1,' + str(max_one_two_char_word_len) + '}\\b|' + cch + '*(?P<ref_char1>' + cch + ')(?!(?P=ref_char1))(?P<ref_char>' + cch + ')' + cch + '*(?!(?P=ref_char1))(?!(?P=ref_char))' + cch + '+)'
-        self.word_pattern = '(?<!' + cch + '[^\\s-])\\b' + short_or_diverse + ncg('(?P<ref_char0>' + self.nonfinal_letter_geresh_pattern + ')' + neg_rep + neg_end_rep) + '+' + self.final_letter_geresh_pattern + '(?!\\w)' + nla('[^\\s-]' + cch) + nla('-' + ncg('$|' + ncch))
+        if self.allow_number_refs:
+            forbidden_trailing = '[^\\W\\d]'
+        else:
+            forbidden_trailing = '\\w'
+
+        self.word_pattern = '(?<!' + cch + '[^\\s-])\\b' + short_or_diverse + ncg('(?P<ref_char0>' + self.nonfinal_letter_geresh_pattern + ')' + neg_rep + neg_end_rep) + '+' + self.final_letter_geresh_pattern + '(?!' + forbidden_trailing + ')' + nla('[^\\s-]' + cch) + nla('-' + ncg('$|' + ncch))
 
         reuse_cnt = {}
 
@@ -160,8 +168,8 @@ class HebTokenizer:
         return cls.hebrew_diacritics_regex.sub('', text)
 
     @classmethod
-    def sanitize(cls, text, is_without_diacritics=False, bible_makaf=False):
-        if not is_without_diacritics:
+    def sanitize(cls, text, remove_diacritics=True, bible_makaf=False):
+        if remove_diacritics:
             text = cls.remove_diacritics(text)
         if bible_makaf:
             text = text.replace('\u05be', ' ')  # for biblical texts makaf is a taam and does not signify hyphenation
@@ -170,8 +178,8 @@ class HebTokenizer:
         return cls.non_hebrew_letters_regex.sub(lambda x: unidecode_expect_nonascii(x.group(), errors='preserve'), text)
 
     @classmethod
-    def find_bad_final(cls, text, is_without_diacritics=False, exceptions=default_bad_final_exceptions, allow_hashtag=True, ret_all=False):  # this could help detect text containing badly fused words or lines
-        if not is_without_diacritics:
+    def find_bad_final(cls, text, remove_diacritics=True, exceptions=default_bad_final_exceptions, allow_hashtag=True, ret_all=False):  # this could help detect text containing badly fused words or lines
+        if remove_diacritics:
             text = cls.remove_diacritics(text)
         if allow_hashtag:
             text = cls.hashtag_regex.sub('', text)
@@ -181,36 +189,36 @@ class HebTokenizer:
             return cls.bad_final_regex.findall(text)
         return cls.bad_final_regex.search(text)
 
-    def is_word(self, text, is_sanitized=False):
-        if not is_sanitized:
+    def is_word(self, text, sanitize=True):
+        if sanitize:
             text = self.sanitize(text)
         return bool(self.word_regex.fullmatch(text))
 
-    def get_words(self, text, is_sanitized=False, iterator=False):
-        if not is_sanitized:
+    def get_words(self, text, sanitize=True, iterator=False):
+        if sanitize:
             text = self.sanitize(text)
         result = (match.group() for match in self.word_regex.finditer(text))
         if not iterator:
             result = list(result)
         return result
 
-    def has_word(self, text, is_sanitized=False):
-        for _ in self.get_words(text, is_sanitized=is_sanitized, iterator=True):
+    def has_word(self, text, sanitize=True):
+        for _ in self.get_words(text, sanitize=sanitize, iterator=True):
             return True
         return False
 
-    def is_mwe(self, text, is_sanitized=False):
-        if not is_sanitized:
+    def is_mwe(self, text, sanitize=True):
+        if sanitize:
             text = self.sanitize(text)
         return bool(self.mwe_regex.fullmatch(text))
 
-    def is_word_or_mwe(self, text, is_sanitized=False):
-        if not is_sanitized:
+    def is_word_or_mwe(self, text, sanitize=True):
+        if sanitize:
             text = self.sanitize(text)
-        return self.is_word(text, is_sanitized=True) or self.is_mwe(text, is_sanitized=True)
+        return self.is_word(text, sanitize=False) or self.is_mwe(text, sanitize=False)
 
-    def get_mwe(self, text, is_sanitized=False, strict=default_strict, iterator=False):
-        if not is_sanitized:
+    def get_mwe(self, text, sanitize=True, strict=default_strict, iterator=False):
+        if sanitize:
             text = self.sanitize(text)
         if self.allow_line_opening_hyphens:
             text = self.line_opening_hyphen_regex.sub('\\1 ', text)
@@ -229,16 +237,16 @@ class HebTokenizer:
             result = list(result)
         return result
 
-    def get_mwe_words(self, text, is_sanitized=False, strict=default_strict, flat=False, iterator=False):
-        result = (self.mwe_words_sep_regex.split(mwe) for mwe in self.get_mwe(text, is_sanitized=is_sanitized, strict=strict))
+    def get_mwe_words(self, text, sanitize=True, strict=default_strict, flat=False, iterator=False):
+        result = (self.mwe_words_sep_regex.split(mwe) for mwe in self.get_mwe(text, sanitize=sanitize, strict=strict))
         if flat:
             result = (word for word_list in result for word in word_list)
         if not iterator:
             result = list(result)
         return result
 
-    def get_mwe_ngrams(self, text, n, is_sanitized=False, strict=default_strict, as_strings=False, flat=False, iterator=False):
-        words = self.get_mwe_words(text, is_sanitized=is_sanitized, strict=strict, flat=False, iterator=iterator)
+    def get_mwe_ngrams(self, text, n, sanitize=True, strict=default_strict, as_strings=False, flat=False, iterator=False):
+        words = self.get_mwe_words(text, sanitize=sanitize, strict=strict, flat=False, iterator=iterator)
         result = ([' '.join(word_list[i : i + n]) if as_strings else tuple(word_list[i : i + n]) for i in range(len(word_list) - n + 1)] for word_list in words if len(word_list) >= n)
         if flat:
             result = (ngram for ngram_list in result for ngram in ngram_list)
@@ -260,8 +268,13 @@ if __name__ == '__main__':
 
     text = 'א בְּרֵאשִׁ֖ית בָּרָ֣א אֱלֹהִ֑ים אֵ֥ת הַשָּׁמַ֖יִם וְאֵ֥ת הָאָֽרֶץ. ב וְהָאָ֗רֶץ הָיְתָ֥ה תֹ֙הוּ֙ וָבֹ֔הוּ וְחֹ֖שֶׁךְ עַל־פְּנֵ֣י תְה֑וֹם, וְר֣וּחַ אֱלֹהִ֔ים מְרַחֶ֖פֶת עַל־פְּנֵ֥י הַמָּֽיִם. ג וַיֹּ֥אמֶר אֱלֹהִ֖ים: "יְהִ֣י א֑וֹר", וַֽיְהִי־אֽוֹר. ד וַיַּ֧רְא אֱלֹהִ֛ים אֶת־הָא֖וֹר כִּי־ט֑וֹב, וַיַּבְדֵּ֣ל אֱלֹהִ֔ים בֵּ֥ין הָא֖וֹר וּבֵ֥ין הַחֹֽשֶׁךְ. ה וַיִּקְרָ֨א אֱלֹהִ֤ים ׀ לָאוֹר֙ "י֔וֹם" וְלַחֹ֖שֶׁךְ קָ֣רָא "לָ֑יְלָה", וַֽיְהִי־עֶ֥רֶב וַֽיְהִי־בֹ֖קֶר י֥וֹם אֶחָֽד.'
 
+    output = ''
     def print_with_len(lst):
+        global output
+        output += str(lst) + '\n'
         print(lst, len(lst))
+
+    saved_hash = '8aae9ff77125d5e0516b8f869c06f023'
 
     print_with_len(text)
     print_with_len(to_final(text))
@@ -286,3 +299,8 @@ if __name__ == '__main__':
     print_with_len(heb_tokenizer.get_mwe_ngrams(text, n=3, as_strings=True))
     print_with_len(heb_tokenizer.get_mwe_ngrams(text, n=3, flat=True))
     print_with_len(heb_tokenizer.get_mwe_ngrams(text, n=3, as_strings=True, flat=True))
+    print_with_len(heb_tokenizer.get_mwe_ngrams(text, n=3, as_strings=True, flat=True))
+
+    myhash = hashlib.md5(output.encode()).hexdigest()
+    assert myhash == saved_hash, myhash
+
