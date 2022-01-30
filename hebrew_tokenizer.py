@@ -1,4 +1,4 @@
-"""A field-tested Hebrew tokenizer for dirty texts (bible, twitter, opensubs, oscar, cc100, mc4) focused on multi-word expression extraction."""
+"""A field-tested Hebrew tokenizer for dirty texts (ben-yehuda project, bible, cc100, mc4, opensubs, oscar, twitter) focused on multi-word expression extraction."""
 
 
 from functools import partialmethod
