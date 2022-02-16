@@ -61,7 +61,7 @@ class HebTokenizer:
         return text.translate(to_final_table)
 
     hebrew_diacritics = '\u0591-\u05bd\u05bf\u05c1\u05c2\u05c4\u05c5\u05c7'  # all nikud and teamim except makaf, pasek, sof-pasuk, nun-hafukha
-    hebrew_diacritics_regex = re.compile(cc(hebrew_diacritics))
+    hebrew_diacritics_regex = re.compile(cc(hebrew_diacritics) + '+')
     horizontal_space = ncc('\\S\t\n\r\f\v')
     pasek_pattern = horizontal_space + '*' + '\u05c0' + horizontal_space + '*'
     pasek_regex = re.compile(pasek_pattern)
@@ -73,12 +73,12 @@ class HebTokenizer:
     final_letters = to_final.__func__(nonfinal_letters) + 'פ'
     nonfinal_letters_allowing_geresh = 'גזצ'
     final_letters_allowing_geresh = to_final.__func__(nonfinal_letters_allowing_geresh) + 'צ'
-    geresh = '\''
+    geresh = "'"
     nonfinal_letter_geresh_pattern = ncg(cc(nonfinal_letters_allowing_geresh) + geresh + '|' + cc(nonfinal_letters))
     final_letter_geresh_pattern = ncg(cc(final_letters_allowing_geresh) + geresh + '|' + cc(final_letters))
     non_hebrew_letters_regex = re.compile(ncc(hebrew_letters) + '+')
     bad_final_regex = re.compile(cc(final_chars) + cc(nonfinal_letters))
-    hashtag_regex = re.compile('#[\\w\'"\u05be\u05f3\u05f4-]+')  # for performance we will not do unidecode sanitizaion so we accomodate makaf, geresh, gershaim explicitly
+    hashtag_regex = re.compile('#[\\w\'"\u05be\u05f3\u05f4-]+')  # for performance we will not do unidecode sanitization so we accommodate makaf, geresh, gershaim explicitly
 
     sentence_sep = '.?!'
     clause_sep_before_space = sentence_sep + ':;,)"'
@@ -135,11 +135,11 @@ class HebTokenizer:
         if max_one_two_char_word_len:
             short_or_diverse = '(?=' + cch + '{1,' + str(max_one_two_char_word_len) + '}\\b|' + cch + '*(?P<ref_char1>' + cch + ')(?!(?P=ref_char1))(?P<ref_char>' + cch + ')' + cch + '*(?!(?P=ref_char1))(?!(?P=ref_char))' + cch + '+)'
         if self.allow_number_refs:
-            forbidden_trailing = '[^\\W\\d]'
+            forbidden_trailing = "[^\\W\\d]|'"
         else:
-            forbidden_trailing = '\\w'
+            forbidden_trailing = "[\\w']"
 
-        self.word_pattern = '(?<!' + cch + '[^\\s-])\\b' + short_or_diverse + ncg('(?P<ref_char0>' + self.nonfinal_letter_geresh_pattern + ')' + neg_rep + neg_end_rep) + '+' + self.final_letter_geresh_pattern + '(?!' + forbidden_trailing + ')' + nla('[^\\s-]' + cch) + nla('-' + ncg('$|' + ncch))
+        self.word_pattern = '(?<!' + cch + '[^\\s-])\\b' + short_or_diverse + ncg('(?P<ref_char0>' + self.nonfinal_letter_geresh_pattern + ')' + neg_rep + neg_end_rep) + '+' + self.final_letter_geresh_pattern + nla(forbidden_trailing) + nla('[^\\s-]' + cch) + nla('-' + ncg('$|' + ncch))
 
         reuse_cnt = {}
 
@@ -269,6 +269,7 @@ if __name__ == '__main__':
     text = 'א בְּרֵאשִׁ֖ית בָּרָ֣א אֱלֹהִ֑ים אֵ֥ת הַשָּׁמַ֖יִם וְאֵ֥ת הָאָֽרֶץ. ב וְהָאָ֗רֶץ הָיְתָ֥ה תֹ֙הוּ֙ וָבֹ֔הוּ וְחֹ֖שֶׁךְ עַל־פְּנֵ֣י תְה֑וֹם, וְר֣וּחַ אֱלֹהִ֔ים מְרַחֶ֖פֶת עַל־פְּנֵ֥י הַמָּֽיִם. ג וַיֹּ֥אמֶר אֱלֹהִ֖ים: "יְהִ֣י א֑וֹר", וַֽיְהִי־אֽוֹר. ד וַיַּ֧רְא אֱלֹהִ֛ים אֶת־הָא֖וֹר כִּי־ט֑וֹב, וַיַּבְדֵּ֣ל אֱלֹהִ֔ים בֵּ֥ין הָא֖וֹר וּבֵ֥ין הַחֹֽשֶׁךְ. ה וַיִּקְרָ֨א אֱלֹהִ֤ים ׀ לָאוֹר֙ "י֔וֹם" וְלַחֹ֖שֶׁךְ קָ֣רָא "לָ֑יְלָה", וַֽיְהִי־עֶ֥רֶב וַֽיְהִי־בֹ֖קֶר י֥וֹם אֶחָֽד.'
 
     output = ''
+
     def print_with_len(lst):
         global output
         output += str(lst) + '\n'
@@ -284,7 +285,7 @@ if __name__ == '__main__':
     print_with_len(sanitize(text))
     print_with_len(HebTokenizer.sanitize(text))
 
-    heb_tokenizer = HebTokenizer()
+    heb_tokenizer = HebTokenizer(allow_number_refs=True)
     print_with_len(heb_tokenizer.sanitize(text))
     print_with_len(heb_tokenizer.get_words(text))
     print('has_word=', heb_tokenizer.has_word(text))
@@ -303,4 +304,3 @@ if __name__ == '__main__':
 
     myhash = hashlib.md5(output.encode()).hexdigest()
     assert myhash == saved_hash, myhash
-
