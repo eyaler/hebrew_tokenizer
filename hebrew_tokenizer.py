@@ -77,6 +77,7 @@ class HebTokenizer:
     nonfinal_letter_geresh_pattern = ncg(cc(nonfinal_letters_allowing_geresh) + geresh + '|' + cc(nonfinal_letters))
     final_letter_geresh_pattern = ncg(cc(final_letters_allowing_geresh) + geresh + '|' + cc(final_letters))
     non_hebrew_letters_regex = re.compile(ncc(hebrew_letters) + '+')
+    non_hebrew_letters_diacritics_regex = re.compile(ncc(hebrew_letters + hebrew_diacritics) + '+')
     bad_final_regex = re.compile(cc(final_chars) + cc(nonfinal_letters))
     hashtag_regex = re.compile('#[\\w\'"\u05be\u05f3\u05f4-]+')  # for performance we will not do unidecode sanitization so we accommodate makaf, geresh, gershaim explicitly
 
@@ -176,7 +177,7 @@ class HebTokenizer:
             text = text.replace('\u05be', ' ')  # for biblical texts makaf is a taam and does not signify hyphenation
         text = cls.pasek_regex.sub(' ', text)  # pasek and any surrounding whitespace signifies a space between words
         text = cls.sofpasuk_regex.sub('. ', text)  # sof-pasuk and any surrounding whitespace signifies an end of a sentence
-        return cls.non_hebrew_letters_regex.sub(lambda x: unidecode_expect_nonascii(x.group(), errors='preserve'), text)
+        return cls.non_hebrew_letters_diacritics_regex.sub(lambda x: unidecode_expect_nonascii(x.group(), errors='preserve'), text)
 
     @classmethod
     def find_bad_final(cls, text, remove_diacritics=True, exceptions=default_bad_final_exceptions, allow_hashtag=True, ret_all=False):  # this could help detect text containing badly fused words or lines
