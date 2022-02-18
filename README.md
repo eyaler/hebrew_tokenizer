@@ -1,7 +1,7 @@
 # hebrew_tokenizer
 A field-tested Hebrew tokenizer for dirty texts (ben-yehuda project, bible, cc100, mc4, opensubs, oscar, twitter) focused on multi-word expression extraction.
 
-* Nikud and Teamim are ignored.
+* Nikud and teamim are ignored. For ktiv-male use cases you may want to set sanitize='leave_diacritics' to discard words with nikud or teamim.
 * Punctuation is normalized to ASCII (using unidecode).
 * Correct usage of final letters (ךםןףץ) is enforced. Final פ and 'צ (with geresh) are allowed.
 * Minimal word length is 2 proper letters.
