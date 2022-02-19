@@ -125,6 +125,7 @@ class HebTokenizer:
         neg_end_rep = ''
         short_or_diverse = ''
         cch = cc(self.hebrew_letters)
+        cchd = cc(self.hebrew_letters + self.hebrew_diacritics + self.geresh)
         ncch = ncc(self.hebrew_letters)
         if max_char_repetition == 2 and allow_mmm:
             mmm = self.mmm_pattern
@@ -137,11 +138,12 @@ class HebTokenizer:
         if max_one_two_char_word_len:
             short_or_diverse = '(?=' + cch + '{1,' + str(max_one_two_char_word_len) + '}\\b|' + cch + '*(?P<ref_char1>' + cch + ')(?!(?P=ref_char1))(?P<ref_char>' + cch + ')' + cch + '*(?!(?P=ref_char1))(?!(?P=ref_char))' + cch + '+)'
         if self.allow_number_refs:
-            forbidden_trailing = "[^\\W\\d]|'"
+            forbidden_trailing = "[^\\W\\d]"
         else:
-            forbidden_trailing = "[\\w']"
+            forbidden_trailing = "[\\w]"
+        forbidden_trailing += '|' + cchd
 
-        self.word_pattern = '(?<!' + cch + '[^\\s-])\\b' + short_or_diverse + ncg('(?P<ref_char0>' + self.nonfinal_letter_geresh_pattern + ')' + neg_rep + neg_end_rep) + '+' + self.final_letter_geresh_pattern + nla(forbidden_trailing) + nla('[^\\s-]' + cch) + nla('-' + ncg('$|' + ncch))
+        self.word_pattern = '(?<!' + cchd + '[^\\s-])\\b' + '(?<!' + cc(self.hebrew_diacritics) + ')' + short_or_diverse + ncg('(?P<ref_char0>' + self.nonfinal_letter_geresh_pattern + ')' + neg_rep + neg_end_rep) + '+' + self.final_letter_geresh_pattern + nla(forbidden_trailing) + nla('[^\\s-]' + cch) + nla('-' + ncg('$|' + ncch))
 
         reuse_cnt = {}
 
